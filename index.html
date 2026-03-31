@@ -381,7 +381,7 @@ function doLookup(studentId){
   var ci=0; for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
   var autoColor=colors[ci%colors.length];
 
-  // Step1: 查名字（已知 JSONP 可用）
+  // Step1: 查名字（JSONP，已知可用）
   jsonp(GAS_URL+'?action=lookupStudent&studentId='+encodeURIComponent(studentId), function(err,data){
     if(err || !data || !data.ok || !data.name){
       setFace('');setStatus('err','找不到');
@@ -389,10 +389,10 @@ function doLookup(studentId){
       speak('找不到這個學號，請再說一次。',function(){setStatus('on','就緒');});
       return;
     }
-    var sName = data.name;
+    var sName    = data.name;
     var courseId = data.courseId || 'GN432';
 
-    // 馬上顯示成功（樂觀更新）
+    // 馬上顯示成功
     setFace('happy');
     typeText(rand(SUCCESS).replace('{n}',sName));
     speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
@@ -400,24 +400,23 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent=checkinCount;
 
-    // Step2: 用 fetch + credentials:include（帶 Google cookie，解決 GAS write 問題）
-    var writeUrl=GAS_URL+'?action=writeCheckin'
-      +'&sid='+encodeURIComponent(SESSION_ID)
-      +'&studentId='+encodeURIComponent(studentId)
-      +'&studentName='+encodeURIComponent(sName)
-      +'&courseId='+encodeURIComponent(courseId)
-      +'&color='+encodeURIComponent(autoColor);
+    // Step2: Google Form POST（從任何網域都能寫入，無 CORS 問題）
+    var formUrl = 'https://docs.google.com/forms/d/1oV8CQfo6VFetRSfKgn8CcIOZeWlKHyuJN8dBAVjhyVE/formResponse';
+    var body = 'entry.1607765355='+encodeURIComponent(SESSION_ID)
+      +'&entry.989471652='+encodeURIComponent(studentId)
+      +'&entry.737802036='+encodeURIComponent(sName)
+      +'&entry.235211122='+encodeURIComponent(courseId)
+      +'&entry.1527101295='+encodeURIComponent(autoColor);
 
-    console.log('writeCheckin:', writeUrl);
-
-    fetch(writeUrl, {
-      method: 'GET',
+    console.log('Form POST:', formUrl);
+    fetch(formUrl, {
+      method: 'POST',
       mode: 'no-cors',
-      credentials: 'include',
-      cache: 'no-cache'
+      headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: body
     }).then(function(){
-      console.log('✅ fetch sent (no-cors+cookies)');
-      // 5秒後確認人數
+      console.log('✅ Form POST sent!');
+      // 8秒後確認人數（等 GAS onFormSubmit 處理完）
       setTimeout(function(){
         jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
           if(!e2&&d2&&d2.ok){
@@ -426,9 +425,9 @@ function doLookup(studentId){
             console.log('人數確認:', d2.presentCount);
           }
         });
-      },5000);
-    }).catch(function(err){
-      console.warn('fetch failed:', err);
+      },8000);
+    }).catch(function(e){
+      console.warn('Form POST failed:', e);
     });
   });
 }
