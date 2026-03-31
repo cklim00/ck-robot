@@ -380,42 +380,54 @@ function doLookup(studentId){
   var colors=['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
   var ci=0; for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
   var autoColor=colors[ci%colors.length];
-  var url=GAS_URL+'?action=fastCheckin'
-    +'&sid='+encodeURIComponent(SESSION_ID)
-    +'&studentId='+encodeURIComponent(studentId)
-    +'&color='+encodeURIComponent(autoColor);
 
-  console.log('fastCheckin XHR:', url);
-
-  // 用 XMLHttpRequest（對 GAS redirect 相容性較好）
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', url, true);
-  xhr.timeout = 20000;
-  xhr.onload = function(){
-    console.log('XHR status:', xhr.status, 'response:', xhr.responseText.substring(0,200));
-    try {
-      var data = JSON.parse(xhr.responseText);
-      handleCheckinData(data, studentId);
-    } catch(e) {
-      console.error('Parse error:', e, xhr.responseText.substring(0,200));
-      // JSONP 備案
-      jsonp(url, function(je,jd){
-        console.log('JSONP fallback result:', JSON.stringify(jd), je);
-        if(!je && jd) handleCheckinData(jd, studentId);
-        else { typeText('連線失敗，請重試'); setStatus('err','失敗'); }
-      });
+  // Step1: 查名字（已知 JSONP 可用）
+  jsonp(GAS_URL+'?action=lookupStudent&studentId='+encodeURIComponent(studentId), function(err,data){
+    if(err || !data || !data.ok || !data.name){
+      setFace('');setStatus('err','找不到');
+      typeText(rand(NOTFOUND));
+      speak('找不到這個學號，請再說一次。',function(){setStatus('on','就緒');});
+      return;
     }
-  };
-  xhr.onerror = xhr.ontimeout = function(){
-    console.warn('XHR failed, trying JSONP...');
-    jsonp(url, function(je,jd){
-      console.log('JSONP fallback result:', JSON.stringify(jd), je);
-      if(!je && jd) handleCheckinData(jd, studentId);
-      else { typeText('連線失敗，請重試'); setStatus('err','失敗'); }
+    var sName = data.name;
+    var courseId = data.courseId || 'GN432';
+
+    // 馬上顯示成功（樂觀更新）
+    setFace('happy');
+    typeText(rand(SUCCESS).replace('{n}',sName));
+    speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
+    addTag(sName);
+    checkinCount++;
+    document.getElementById('cntN').textContent=checkinCount;
+
+    // Step2: 只傳 appendRow（不查任何資料，超快）
+    var writeUrl=GAS_URL+'?action=writeCheckin'
+      +'&sid='+encodeURIComponent(SESSION_ID)
+      +'&studentId='+encodeURIComponent(studentId)
+      +'&studentName='+encodeURIComponent(sName)
+      +'&courseId='+encodeURIComponent(courseId)
+      +'&color='+encodeURIComponent(autoColor);
+
+    console.log('writeCheckin:', writeUrl);
+    jsonp(writeUrl, function(we,wd){
+      console.log('writeCheckin result:', JSON.stringify(wd), we);
+      if(!we && wd && wd.ok){
+        console.log('✅ 寫入成功！');
+        setTimeout(function(){
+          jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
+            if(!e2&&d2&&d2.ok){
+              document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
+              document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
+            }
+          });
+        },2000);
+      } else {
+        console.warn('⚠️ 寫入失敗:', we, wd);
+      }
     });
-  };
-  xhr.send();
+  });
 }
+
 
 function handleCheckinData(data, studentId){
   if(!data.ok && !data.alreadySigned){
