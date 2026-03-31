@@ -395,7 +395,7 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent=checkinCount;
 
-    // Step 3: fetch no-cors 觸發寫入（不需等回應，GAS一定會執行）
+    // Step 3: 寫入出席紀錄（fetch CORS，GitHub Pages 支援）
     var colors=['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
     var ci=0; for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
     var autoColor=colors[ci%colors.length];
@@ -405,26 +405,46 @@ function doLookup(studentId){
       +'&studentId='+encodeURIComponent(studentId)
       +'&color='+encodeURIComponent(autoColor);
 
-    // 用 fetch no-cors：繞過 CORS，GAS 一定收到並執行，只是不回傳結果
-    if(window.fetch){
-      fetch(writeUrl, {method:'GET', mode:'no-cors', cache:'no-cache'})
-        .then(function(){ console.log('fetch no-cors sent'); })
-        .catch(function(e){ console.warn('fetch failed:', e); });
-    } else {
-      // 舊瀏覽器用 Image 備案
-      new Image().src = writeUrl;
-    }
+    console.log('Writing checkin:', writeUrl);
 
-    // Step 4: 5秒後 JSONP 確認人數（同時會觸發 Garden 更新）
-    setTimeout(function(){
-      jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
-        if(!e2 && d2 && d2.ok){
-          document.getElementById('cntN').textContent = d2.presentCount || checkinCount;
-          document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
-          console.log('Present count confirmed:', d2.presentCount);
-        }
-      });
-    }, 5000);
+    function tryWrite(attempt){
+      fetch(writeUrl, {method:'GET', redirect:'follow'})
+        .then(function(r){ return r.text(); })
+        .then(function(txt){
+          console.log('GAS response:', txt);
+          try {
+            var res = JSON.parse(txt);
+            if(res.ok || res.alreadySigned){
+              // 成功！更新人數
+              document.getElementById('cntN').textContent = checkinCount;
+              jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
+                if(!e2&&d2&&d2.ok){
+                  document.getElementById('cntN').textContent = d2.presentCount||checkinCount;
+                  document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
+                }
+              });
+            } else if(attempt < 3){
+              console.warn('Write returned error, retry', attempt, res);
+              setTimeout(function(){tryWrite(attempt+1);}, 2000);
+            }
+          } catch(e){
+            console.warn('Parse error, raw:', txt.substring(0,200));
+            if(attempt < 3) setTimeout(function(){tryWrite(attempt+1);}, 2000);
+          }
+        })
+        .catch(function(err){
+          console.warn('Fetch attempt', attempt, 'failed:', err);
+          if(attempt < 3){
+            setTimeout(function(){tryWrite(attempt+1);}, 2000);
+          } else {
+            // 最後備案：JSONP
+            jsonp(writeUrl, function(we,wd){
+              console.log('JSONP fallback:', JSON.stringify(wd), we);
+            });
+          }
+        });
+    }
+    tryWrite(1);
   });
 }
 
