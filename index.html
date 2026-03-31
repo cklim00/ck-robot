@@ -401,7 +401,7 @@ function doLookup(studentId){
     document.getElementById('cntN').textContent=checkinCount;
 
     // Step2: Google Form POST（從任何網域都能寫入，無 CORS 問題）
-    var formUrl = 'https://docs.google.com/forms/d/1oV8CQfo6VFetRSfKgn8CcIOZeWlKHyuJN8dBAVjhyVE/formResponse';
+    var formUrl = 'https://docs.google.com/forms/d/e/1FAIpQLScQeOJ0p3sZLGHWFWhTuAOrMy8M7JcRo1QVwRWMmMwWRMcgvA/formResponse';
     var body = 'entry.1607765355='+encodeURIComponent(SESSION_ID)
       +'&entry.989471652='+encodeURIComponent(studentId)
       +'&entry.737802036='+encodeURIComponent(sName)
