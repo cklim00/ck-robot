@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>點名小CK</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+:root{--bg:#060e06;--green:#39ff14;--gdim:#1a7a08;--dark:#071208;--scan:rgba(0,0,0,.13)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--green);font-family:'VT323',monospace;height:100vh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,var(--scan) 0,var(--scan) 1px,transparent 1px,transparent 3px);pointer-events:none;z-index:100}
+body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 60%,rgba(0,0,0,.65) 100%);pointer-events:none;z-index:99}
+
+.wrap{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px}
+.topbar{width:100%;display:flex;justify-content:space-between;font-family:'Press Start 2P',monospace;font-size:7px;color:var(--gdim);border-bottom:1px solid var(--gdim);padding-bottom:5px}
+.robot-area{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px}
+.robot-svg{width:110px;height:110px;filter:drop-shadow(0 0 10px var(--green))}
+.robot-name{font-family:'Press Start 2P',monospace;font-size:8px;color:var(--green);text-shadow:0 0 10px var(--green);letter-spacing:2px}
+.bubble{position:relative;background:var(--dark);border:3px solid var(--gdim);padding:10px 14px;width:calc(100% - 20px);max-width:360px;min-height:58px;box-shadow:inset 2px 2px 0 var(--gdim),0 0 14px rgba(57,255,20,.12)}
+.bubble::before{content:'▶';position:absolute;top:-16px;left:50%;transform:translateX(-50%) rotate(-90deg);color:var(--gdim);font-size:12px}
+.btext{font-size:22px;color:var(--green);line-height:1.35;min-height:40px}
+.cursor{display:inline-block;width:10px;height:18px;background:var(--green);margin-left:2px;vertical-align:middle;animation:blink .7s step-end infinite}
+@keyframes blink{50%{opacity:0}}
+.mic-btn{background:transparent;border:3px solid var(--gdim);color:var(--green);font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--dark);transition:all .1s;letter-spacing:1px}
+.mic-btn:hover{background:var(--dark);box-shadow:1px 1px 0 var(--dark);transform:translate(2px,2px)}
+.mic-btn.rec{border-color:var(--green);background:var(--dark);animation:mpulse .4s ease-in-out infinite alternate}
+@keyframes mpulse{from{box-shadow:3px 3px 0 var(--dark)}to{box-shadow:3px 3px 0 var(--dark),0 0 18px rgba(57,255,20,.4)}}
+.tags{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;min-height:26px}
+.tag{padding:2px 8px;border:2px solid var(--gdim);font-size:14px;color:var(--gdim)}
+.tag.new{border-color:var(--green);color:var(--green);text-shadow:0 0 5px var(--green)}
+.statusbar{width:100%;border-top:1px solid var(--gdim);padding-top:5px;display:flex;justify-content:space-between;align-items:center;font-size:16px}
+.dot{width:8px;height:8px;background:var(--gdim);display:inline-block;margin-right:5px}
+.dot.on{background:var(--green);animation:pdot .5s ease-in-out infinite alternate}
+.dot.err{background:#f33}
+@keyframes pdot{from{opacity:.4}to{opacity:1}}
+.diag-btn{background:transparent;border:1px solid #1a4a08;color:#1a7a08;font-family:'VT323',monospace;font-size:13px;padding:1px 6px;cursor:pointer}
+/* 眼睛表情 */
+.eye-grp{transform-origin:center;animation:eblink 3.5s ease-in-out infinite}
+.eye-grp.listen{animation:elisten .5s ease-in-out infinite alternate}
+.eye-grp.happy{animation:none}
+@keyframes eblink{0%,88%,100%{transform:scaleY(1)}93%{transform:scaleY(.08)}}
+@keyframes elisten{from{transform:scaleY(1)}to{transform:scaleY(.65)}}
+/* 故障動畫 */
+@keyframes glitch{0%,94%,100%{transform:translateX(0);filter:none}95%{transform:translateX(-3px);filter:hue-rotate(90deg)}97%{transform:translateX(3px);filter:hue-rotate(-90deg)}}
+.robot-svg{animation:glitch 9s infinite}
+/* 擺動 */
+@keyframes sway{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <span id="topTitle">GN432 // ROLL-CALL SYS v3.0</span>
+    <span id="clock">--:--:--</span>
+  </div>
+
+  <div class="robot-area">
+    <!-- 像素機器人 -->
+    <svg class="robot-svg" viewBox="0 0 110 120" xmlns="http://www.w3.org/2000/svg">
+      <rect x="18" y="14" width="74" height="72" fill="#050f03" stroke="#1a7a08" stroke-width="3"/>
+      <rect x="24" y="20" width="62" height="60" fill="#071208" stroke="#0d3d04" stroke-width="1"/>
+      <rect x="52" y="2" width="6" height="14" fill="#1a7a08"/>
+      <rect x="46" y="0" width="18" height="4" fill="#1a7a08"/>
+      <rect x="50" y="0" width="10" height="4" fill="#39ff14"/>
+      <rect x="10" y="30" width="8" height="12" fill="#0d3d04" stroke="#1a7a08" stroke-width="2"/>
+      <rect x="92" y="30" width="8" height="12" fill="#0d3d04" stroke="#1a7a08" stroke-width="2"/>
+      <rect x="12" y="34" width="4" height="4" fill="#39ff14" id="earL"/>
+      <rect x="94" y="34" width="4" height="4" fill="#39ff14" id="earR"/>
+      <g class="eye-grp" id="eyeGrp">
+        <rect x="28" y="28" width="22" height="18" fill="#071208" stroke="#1a7a08" stroke-width="2"/>
+        <rect x="33" y="32" width="12" height="10" fill="#39ff14" id="eyeLP"/>
+        <rect x="37" y="34" width="4" height="4" fill="#071208"/>
+        <rect x="60" y="28" width="22" height="18" fill="#071208" stroke="#1a7a08" stroke-width="2"/>
+        <rect x="65" y="32" width="12" height="10" fill="#39ff14" id="eyeRP"/>
+        <rect x="69" y="34" width="4" height="4" fill="#071208"/>
+      </g>
+      <rect x="52" y="50" width="6" height="4" fill="#1a7a08"/>
+      <g id="mouth">
+        <rect x="36" y="62" width="4" height="3" fill="#1a7a08"/>
+        <rect x="40" y="64" width="4" height="3" fill="#1a7a08"/>
+        <rect x="44" y="65" width="22" height="4" fill="#39ff14"/>
+        <rect x="66" y="64" width="4" height="3" fill="#1a7a08"/>
+        <rect x="70" y="62" width="4" height="3" fill="#1a7a08"/>
+      </g>
+      <rect x="26" y="60" width="10" height="3" fill="#1a7a08" opacity=".6" id="blushL"/>
+      <rect x="74" y="60" width="10" height="3" fill="#1a7a08" opacity=".6" id="blushR"/>
+      <rect x="38" y="86" width="34" height="8" fill="#0d3d04" stroke="#1a7a08" stroke-width="2"/>
+      <rect x="24" y="94" width="62" height="16" fill="#071208" stroke="#1a7a08" stroke-width="2"/>
+      <rect x="44" y="98" width="8" height="8" fill="#39ff14" id="led1" opacity=".7"/>
+      <rect x="58" y="98" width="8" height="8" fill="#1a7a08" id="led2"/>
+    </svg>
+
+    <div class="robot-name">▸ 點名小CK ◂</div>
+
+    <div class="bubble">
+      <div class="btext" id="btext">啟動中...<span class="cursor"></span></div>
+    </div>
+
+    <button class="mic-btn" id="micBtn" onclick="startListen()">[ 🎤 開始說話 ]</button>
+
+    <div class="tags" id="tags"></div>
+  </div>
+
+  <div class="statusbar">
+    <span><span class="dot" id="dot"></span><span id="statusTxt">連線中</span></span>
+    <span id="cntDisplay">已簽到 <b id="cntN">0</b><span id="cntTotal">/0</span> 人</span>
+    <button class="diag-btn" onclick="runDiag()">診斷</button>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════
+// 設定（固定，不需修改）
+// ════════════════════════════════════
+var GAS_URL    = 'https://script.google.com/macros/s/AKfycbwCVcFSTRhZSH3zse5WBFyR9HqZPjqhDpTTpephd3DrLZ1P_3LMYcOoSU0Q64Ya3WiD/exec';
+var SESSION_ID = '';
+var GARDEN_URL = '';
+var checkinCount = 0;
+var isListening  = false;
+var isSpeaking   = false;
+var recognition  = null;
+
+// ════════════════════════════════════
+// 時鐘
+// ════════════════════════════════════
+setInterval(function(){
+  var n=new Date();
+  document.getElementById('clock').textContent=
+    ('0'+n.getHours()).slice(-2)+':'+('0'+n.getMinutes()).slice(-2)+':'+('0'+n.getSeconds()).slice(-2);
+},1000);
+
+// LED 閃爍
+var ls=true;
+setInterval(function(){
+  ls=!ls;
+  document.getElementById('led1').style.opacity=ls?'.9':'.3';
+  document.getElementById('led2').style.opacity=ls?'.3':'.9';
+},900);
+
+// ════════════════════════════════════
+// 打字效果
+// ════════════════════════════════════
+var _tt=null;
+function typeText(txt){
+  var el=document.getElementById('btext');
+  if(_tt)clearInterval(_tt);
+  el.innerHTML='<span class="cursor"></span>';
+  var i=0;
+  _tt=setInterval(function(){
+    if(i<txt.length){
+      el.textContent=txt.substring(0,i+1);
+      i++;
+    } else {
+      clearInterval(_tt);
+    }
+  },38);
+}
+
+// ════════════════════════════════════
+// 表情
+// ════════════════════════════════════
+function setFace(mood){
+  var eg=document.getElementById('eyeGrp');
+  eg.className='eye-grp';
+  document.getElementById('blushL').style.opacity='.6';
+  document.getElementById('blushR').style.opacity='.6';
+  if(mood==='listen'){eg.classList.add('listen');}
+  else if(mood==='happy'){
+    eg.classList.add('happy');
+    document.getElementById('blushL').style.opacity='1';
+    document.getElementById('blushR').style.opacity='1';
+  }
+}
+
+// ════════════════════════════════════
+// 狀態列
+// ════════════════════════════════════
+function setStatus(state,txt){
+  document.getElementById('dot').className='dot '+(state==='on'?'on':state==='err'?'err':'');
+  document.getElementById('statusTxt').textContent=txt;
+}
+
+// ════════════════════════════════════
+// TTS
+// ════════════════════════════════════
+var VOICES_LOADED=false;
+function loadVoices(){if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=function(){VOICES_LOADED=true;window.speechSynthesis.getVoices();};}}
+function speak(txt,cb){
+  if(!window.speechSynthesis)return cb&&cb();
+  window.speechSynthesis.cancel();
+  var u=new SpeechSynthesisUtterance(txt);
+  u.lang='zh-TW';u.rate=.95;u.pitch=1.1;
+  var vs=window.speechSynthesis.getVoices();
+  var v=vs.find(function(x){return x.lang.includes('zh-TW');})||vs.find(function(x){return x.lang.includes('zh');});
+  if(v)u.voice=v;
+  isSpeaking=true;
+  u.onend=u.onerror=function(){isSpeaking=false;if(cb)cb();};
+  window.speechSynthesis.speak(u);
+}
+
+// ════════════════════════════════════
+// JSONP
+// ════════════════════════════════════
+function jsonp(url, cb){
+  var name='_ck_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+  var done=false;
+  var script=document.createElement('script');
+  var timer=setTimeout(function(){finish(new Error('timeout'),null);},15000);
+  function finish(e,d){
+    if(done)return;done=true;
+    clearTimeout(timer);
+    try{delete window[name];}catch(ex){}
+    try{if(script.parentNode)script.parentNode.removeChild(script);}catch(ex){}
+    cb(e,d);
+  }
+  window[name]=function(d){finish(null,d);};
+  script.onerror=function(){finish(new Error('script error'),null);};
+  script.src=url+(url.indexOf('?')>=0?'&':'?')+'callback='+name;
+  document.head.appendChild(script);
+}
+
+// ════════════════════════════════════
+// 啟動：自動抓場次
+// ════════════════════════════════════
+function init(){
+  typeText('連線中，抓取今日場次...');
+  setStatus('','連線中');
+  jsonp(GAS_URL+'?action=getOpenSession', function(err,data){
+    if(!err && data && data.ok && data.sessionId){
+      GARDEN_URL = data.gardenUrl || '';
+      document.getElementById('topTitle').textContent = 'GN432 // ' + (data.courseName||'');
+      showSessionConfirm(data.sessionId, data.courseName, data.presentCount||0, data.totalCount||0);
+    } else {
+      setStatus('err','無場次');
+      typeText('找不到開放中的場次\n請手動輸入場次ID');
+      showManualInput();
+    }
+  });
+}
+
+function showSessionConfirm(sid, courseName, present, total){
+  typeText('請老師確認場次ID後開始點名：');
+  var bubble = document.querySelector('.bubble');
+  var existing = document.getElementById('scArea');
+  if(existing) existing.remove();
+  var div = document.createElement('div');
+  div.id = 'scArea';
+  div.style.cssText = 'margin-top:8px;';
+  div.innerHTML =
+    '<div style="font-size:13px;color:#1a7a08;margin-bottom:3px;">場次ID：</div>'+
+    '<input id="sidInput" value="'+sid+'" style="width:100%;background:#071208;border:2px solid #39ff14;color:#39ff14;padding:4px 8px;font-family:VT323,monospace;font-size:19px;margin-bottom:5px;">'+
+    '<div style="font-size:13px;color:#1a7a08;margin-bottom:5px;">'+(courseName||'')+'　已到：'+present+'/'+total+'人</div>'+
+    '<button onclick="confirmSession()" style="width:100%;background:#0d3d04;border:2px solid #39ff14;color:#39ff14;padding:5px;font-family:VT323,monospace;font-size:18px;cursor:pointer;">✅ 確認開始！</button>';
+  bubble.appendChild(div);
+  setTimeout(function(){ var i=document.getElementById('sidInput'); if(i){i.focus();i.select();} },100);
+}
+
+function confirmSession(){
+  var inp = document.getElementById('sidInput');
+  if(!inp || !inp.value.trim()) return;
+  SESSION_ID = inp.value.trim();
+  var a = document.getElementById('scArea'); if(a) a.remove();
+  setStatus('on','就緒'); setFace('');
+  typeText('場次：'+SESSION_ID+'\n大家好！我是點名小CK！\n請按按鈕說出學號！');
+  speak('大家好！我是點名小CK！請說出你的學號完成點名！');
+  if(GARDEN_URL) addGardenBtn();
+}
+
+
+function addGardenBtn(){
+  var existing=document.getElementById('gardenBtn');
+  if(existing)return;
+  var btn=document.createElement('button');
+  btn.id='gardenBtn';
+  btn.textContent='🌸 花園投影牆';
+  btn.style.cssText='background:rgba(57,255,20,.1);border:2px solid #39ff14;color:#39ff14;font-family:VT323,monospace;font-size:16px;padding:4px 12px;cursor:pointer;margin-top:4px;';
+  btn.onclick=function(){window.open(GARDEN_URL,'_blank');};
+  document.querySelector('.robot-area').appendChild(btn);
+}
+
+function showManualInput(){
+  var div=document.createElement('div');
+  div.style.cssText='display:flex;gap:6px;margin-top:8px;';
+  div.innerHTML='<input id="manSid" placeholder="場次ID，例：CK04021430" style="flex:1;background:#071208;border:2px solid #1a7a08;color:#39ff14;padding:5px 8px;font-family:VT323,monospace;font-size:18px;">'
+    +'<button onclick="confirmManual()" style="background:#0d3d04;border:2px solid #39ff14;color:#39ff14;padding:5px 12px;font-family:VT323,monospace;font-size:16px;cursor:pointer;">確認</button>';
+  document.querySelector('.bubble').appendChild(div);
+  setTimeout(function(){var el=document.getElementById('manSid');if(el)el.focus();},100);
+}
+
+function confirmManual(){
+  var inp=document.getElementById('manSid');
+  if(!inp||!inp.value.trim())return;
+  SESSION_ID=inp.value.trim();
+  var p=inp.parentNode;if(p)p.remove();
+  setStatus('on','手動模式');
+  typeText('好！場次：'+SESSION_ID+'\n按下按鈕說出學號！');
+  speak('好的！請按按鈕說出你的學號！');
+}
+
+// ════════════════════════════════════
+// 語音辨識
+// ════════════════════════════════════
+function startListen(){
+  if(isListening)return;
+  if(isSpeaking){window.speechSynthesis.cancel();isSpeaking=false;}
+  if(!SESSION_ID){typeText('請先等待場次載入\n或手動輸入場次ID');return;}
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){typeText('此瀏覽器不支援語音\n請使用 Chrome！');return;}
+  recognition=new SR();
+  recognition.lang='zh-TW';
+  recognition.interimResults=false;
+  recognition.maxAlternatives=3;
+  recognition.continuous=false;
+  var btn=document.getElementById('micBtn');
+  btn.classList.add('rec');
+  btn.textContent='[ 🔴 聽取中... ]';
+  isListening=true;
+  setFace('listen');
+  setStatus('on','聆聽中');
+  typeText('請說出你的學號...');
+
+  recognition.onresult=function(e){
+    var heard='';
+    for(var i=0;i<e.results[0].length;i++){
+      var t=e.results[0][i].transcript.trim();
+      var n=t.replace(/[^0-9]/g,'');
+      if(n.length>=6){heard=n;break;}
+      heard=t;
+    }
+    processCheckin(heard);
+  };
+  recognition.onerror=function(e){
+    resetBtn();
+    if(e.error==='not-allowed'){
+      setStatus('err','麥克風被拒');
+      typeText('請允許麥克風！\n點網址列旁的鎖頭圖示');
+    } else if(e.error==='no-speech'){
+      setStatus('on','就緒');setFace('');typeText('沒聽到聲音，再試一次？');
+    } else {
+      setStatus('err',e.error);typeText('辨識失敗 ('+e.error+')\n再按一次！');
+    }
+  };
+  recognition.onend=function(){resetBtn();};
+  recognition.start();
+}
+
+function resetBtn(){
+  isListening=false;
+  var btn=document.getElementById('micBtn');
+  btn.classList.remove('rec');
+  btn.textContent='[ 🎤 開始說話 ]';
+}
+
+// ════════════════════════════════════
+// 簽到流程
+// ════════════════════════════════════
+var CONFIRMS=['好的！查名單中...','收到！確認中...','嗯嗯！等我找一下...','好！查詢中...'];
+var SUCCESS=['{n}，簽到成功！花朵種好了！','歡迎 {n}！出席紀錄完成！','{n}！叮！登記了！','收到！{n} 已到，辛苦了！'];
+var ALREADY=['{n}，你剛才已經簽到了！','同學，你已經在名單上了！','{n}，不要重複簽到啦！'];
+var NOTFOUND=['找不到這個學號，再說一次？','嗯...名單裡沒有，再試試？','奇怪，沒找到，確認學號後再說'];
+
+function rand(a){return a[Math.floor(Math.random()*a.length)];}
+
+function processCheckin(studentId){
+  setStatus('on','處理中');
+  typeText(rand(CONFIRMS)+'\n學號：'+studentId);
+
+  // 步驟0：確認場次仍有效（避免使用過期的SESSION_ID）
+  jsonp(GAS_URL+'?action=getOpenSession', function(se,sd){
+    if(!se && sd && sd.ok && sd.sessionId){
+      SESSION_ID = sd.sessionId;  // 更新為最新場次
+      if(sd.gardenUrl) GARDEN_URL = sd.gardenUrl;
+    }
+    doLookup(studentId);
+  });
+}
+
+function doLookup(studentId){
+  // Step 1: 查學生姓名（JSONP，快速讀取）
+  jsonp(GAS_URL+'?action=lookupStudent&studentId='+encodeURIComponent(studentId), function(err,data){
+    var sName=(!err&&data&&data.ok&&data.name)?data.name:null;
+    if(!sName){
+      setFace('');setStatus('err','找不到');
+      typeText(rand(NOTFOUND));
+      speak('找不到這個學號，請再說一次。',function(){setStatus('on','就緒');});
+      return;
+    }
+
+    // Step 2: 顯示成功、念出名字
+    setFace('happy');
+    typeText(rand(SUCCESS).replace('{n}',sName));
+    speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
+    addTag(sName);
+    checkinCount++;
+    document.getElementById('cntN').textContent=checkinCount;
+
+    // Step 3: fetch no-cors 觸發寫入（不需等回應，GAS一定會執行）
+    var colors=['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
+    var ci=0; for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
+    var autoColor=colors[ci%colors.length];
+    var writeUrl=GAS_URL
+      +'?action=voiceCheckin'
+      +'&sid='+encodeURIComponent(SESSION_ID)
+      +'&studentId='+encodeURIComponent(studentId)
+      +'&color='+encodeURIComponent(autoColor);
+
+    // 用 fetch no-cors：繞過 CORS，GAS 一定收到並執行，只是不回傳結果
+    if(window.fetch){
+      fetch(writeUrl, {method:'GET', mode:'no-cors', cache:'no-cache'})
+        .then(function(){ console.log('fetch no-cors sent'); })
+        .catch(function(e){ console.warn('fetch failed:', e); });
+    } else {
+      // 舊瀏覽器用 Image 備案
+      new Image().src = writeUrl;
+    }
+
+    // Step 4: 5秒後 JSONP 確認人數（同時會觸發 Garden 更新）
+    setTimeout(function(){
+      jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
+        if(!e2 && d2 && d2.ok){
+          document.getElementById('cntN').textContent = d2.presentCount || checkinCount;
+          document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
+          console.log('Present count confirmed:', d2.presentCount);
+        }
+      });
+    }, 5000);
+  });
+}
+
+
+function addTag(name){
+  var list=document.getElementById('tags');
+  var t=document.createElement('div');
+  t.className='tag new';t.textContent=name;
+  list.insertBefore(t,list.firstChild);
+  setTimeout(function(){t.classList.remove('new');},2000);
+  while(list.children.length>6)list.removeChild(list.lastChild);
+}
+
+// ════════════════════════════════════
+// 診斷
+// ════════════════════════════════════
+function runDiag(){
+  typeText('診斷中...');
+  if(!GAS_URL){typeText('GAS_URL 未設定！');return;}
+  jsonp(GAS_URL+'?action=getOpenSession',function(err,data){
+    if(err){
+      typeText('GAS 連線失敗\n錯誤：'+err.message);
+    } else {
+      typeText('GAS OK！\n'+JSON.stringify(data).substring(0,100));
+    }
+  });
+}
+
+// ════════════════════════════════════
+// 空白鍵觸發
+// ════════════════════════════════════
+document.addEventListener('keydown',function(e){
+  if(e.code==='Space'&&!isListening&&!isSpeaking){e.preventDefault();startListen();}
+});
+
+// ════════════════════════════════════
+// 啟動
+// ════════════════════════════════════
+window.addEventListener('load',function(){
+  loadVoices();
+  setTimeout(init, 600);
+});
+</script>
+</body>
+</html>
