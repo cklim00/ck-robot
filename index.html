@@ -381,7 +381,6 @@ function doLookup(studentId){
   var ci=0; for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
   var autoColor=colors[ci%colors.length];
 
-  // Step1: 查名字（JSONP，已知可用）
   jsonp(GAS_URL+'?action=lookupStudent&studentId='+encodeURIComponent(studentId), function(err,data){
     if(err || !data || !data.ok || !data.name){
       setFace('');setStatus('err','找不到');
@@ -392,7 +391,6 @@ function doLookup(studentId){
     var sName    = data.name;
     var courseId = data.courseId || 'GN432';
 
-    // 馬上顯示成功
     setFace('happy');
     typeText(rand(SUCCESS).replace('{n}',sName));
     speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
@@ -400,36 +398,56 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent=checkinCount;
 
-    // Step2: Google Form POST（從任何網域都能寫入，無 CORS 問題）
-    var formUrl = 'https://docs.google.com/forms/d/e/1FAIpQLScQeOJ0p3sZLGHWFWhTuAOrMy8M7JcRo1QVwRWMmMwWRMcgvA/formResponse';
-    var body = 'entry.1607765355='+encodeURIComponent(SESSION_ID)
-      +'&entry.989471652='+encodeURIComponent(studentId)
-      +'&entry.737802036='+encodeURIComponent(sName)
-      +'&entry.235211122='+encodeURIComponent(courseId)
-      +'&entry.1527101295='+encodeURIComponent(autoColor);
-
-    console.log('Form POST:', formUrl);
-    fetch(formUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {'Content-Type':'application/x-www-form-urlencoded'},
-      body: body
-    }).then(function(){
-      console.log('✅ Form POST sent!');
-      // 8秒後確認人數（等 GAS onFormSubmit 處理完）
-      setTimeout(function(){
-        jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
-          if(!e2&&d2&&d2.ok){
-            document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
-            document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
-            console.log('人數確認:', d2.presentCount);
-          }
-        });
-      },8000);
-    }).catch(function(e){
-      console.warn('Form POST failed:', e);
+    // 用隱藏 form 元素送出（最可靠，繞過所有 CORS/fetch 限制）
+    submitViaHiddenForm({
+      'entry.1607765355': SESSION_ID,
+      'entry.989471652':   studentId,
+      'entry.737802036':   sName,
+      'entry.235211122':   courseId,
+      'entry.1527101295':   autoColor
     });
+
+    setTimeout(function(){
+      jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
+        if(!e2&&d2&&d2.ok){
+          document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
+          document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
+          console.log('人數確認:', d2.presentCount);
+        }
+      });
+    },8000);
   });
+}
+
+function submitViaHiddenForm(fields){
+  // 用傳統 form submit 到 Google Forms（iframe target，不跳頁）
+  var iframeName='ck_iframe_'+Date.now();
+  var iframe=document.createElement('iframe');
+  iframe.name=iframeName;
+  iframe.style.cssText='display:none;';
+  document.body.appendChild(iframe);
+
+  var form=document.createElement('form');
+  form.action='https://docs.google.com/forms/d/e/1FAIpQLScQeOJ0p3sZLGHWFWhTuAOrMy8M7JcRo1QVwRWMmMwWRMcgvA/formResponse';
+  form.method='POST';
+  form.target=iframeName;
+  form.style.display='none';
+
+  Object.keys(fields).forEach(function(name){
+    var inp=document.createElement('input');
+    inp.type='hidden';
+    inp.name=name;
+    inp.value=fields[name];
+    form.appendChild(inp);
+  });
+
+  document.body.appendChild(form);
+  form.submit();
+  console.log('✅ Hidden form submitted!');
+
+  setTimeout(function(){
+    try{document.body.removeChild(form);document.body.removeChild(iframe);}catch(e){}
+  },5000);
 }
 
 
