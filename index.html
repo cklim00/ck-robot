@@ -400,7 +400,7 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent=checkinCount;
 
-    // Step2: 只傳 appendRow（不查任何資料，超快）
+    // Step2: 用 fetch + credentials:include（帶 Google cookie，解決 GAS write 問題）
     var writeUrl=GAS_URL+'?action=writeCheckin'
       +'&sid='+encodeURIComponent(SESSION_ID)
       +'&studentId='+encodeURIComponent(studentId)
@@ -409,21 +409,26 @@ function doLookup(studentId){
       +'&color='+encodeURIComponent(autoColor);
 
     console.log('writeCheckin:', writeUrl);
-    jsonp(writeUrl, function(we,wd){
-      console.log('writeCheckin result:', JSON.stringify(wd), we);
-      if(!we && wd && wd.ok){
-        console.log('✅ 寫入成功！');
-        setTimeout(function(){
-          jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
-            if(!e2&&d2&&d2.ok){
-              document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
-              document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
-            }
-          });
-        },2000);
-      } else {
-        console.warn('⚠️ 寫入失敗:', we, wd);
-      }
+
+    fetch(writeUrl, {
+      method: 'GET',
+      mode: 'no-cors',
+      credentials: 'include',
+      cache: 'no-cache'
+    }).then(function(){
+      console.log('✅ fetch sent (no-cors+cookies)');
+      // 5秒後確認人數
+      setTimeout(function(){
+        jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
+          if(!e2&&d2&&d2.ok){
+            document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
+            document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
+            console.log('人數確認:', d2.presentCount);
+          }
+        });
+      },5000);
+    }).catch(function(err){
+      console.warn('fetch failed:', err);
     });
   });
 }
