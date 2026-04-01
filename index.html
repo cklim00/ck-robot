@@ -264,12 +264,22 @@ function jsonpSilent(url, cb){
 }
 
 // ════════════════════════════════════
-// 啟動：自動抓場次
+// 啟動：先暖機再抓場次
 // ════════════════════════════════════
+function warmUp(cb){
+  // 發一個超輕量請求把 GAS runtime 喚醒
+  var startT = Date.now();
+  typeText('系統暖機中...\n首次啟動約需 10 秒');
+  jsonp(GAS_URL+'?action=getOpenSession', function(err, data){
+    var elapsed = ((Date.now()-startT)/1000).toFixed(1);
+    console.log('暖機完成，耗時 '+elapsed+' 秒');
+    cb(err, data);
+  });
+}
+
 function init(){
-  typeText('連線中，抓取今日場次...');
   setStatus('','連線中');
-  jsonp(GAS_URL+'?action=getOpenSession', function(err,data){
+  warmUp(function(err, data){
     if(!err && data && data.ok && data.sessionId){
       GARDEN_URL = data.gardenUrl || '';
       document.getElementById('topTitle').textContent = 'GN432 // ' + (data.courseName||'');
