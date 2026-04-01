@@ -498,16 +498,6 @@ function doLookup(studentId){
   });
 }
 
-    // 找不到學號
-    if(!data || !data.ok || !data.name){
-      setFace('');setStatus('err','找不到');
-      typeText(rand(NOTFOUND));
-      speak('找不到這個學號，請再說一次。', function(){setStatus('on','就緒');});
-      return;
-    }
-
-    var sName = data.name;
-
 function addTag(name){
   var list=document.getElementById('tags');
   var t=document.createElement('div');
