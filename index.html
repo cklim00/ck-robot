@@ -493,7 +493,7 @@ function doLookup(studentId){
       + '&name='      + encodeURIComponent(sName)
       + '&color='     + encodeURIComponent(autoColor);
 
-    fetch(writeUrl, { mode: 'no-cors' })
+    fetch(writeUrl, { mode: 'no-cors', credentials: 'include' })
       .then(function(){
         console.log('✅ 背景寫入已送出：', sName);
         setTimeout(function(){
