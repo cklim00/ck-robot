@@ -141,6 +141,7 @@ var checkinCount = 0;
 var isListening  = false;
 var isSpeaking   = false;
 var recognition  = null;
+var checkedSet   = {};  // 本地防重複記憶 { "場次ID_學號": true }
 
 // ════════════════════════════════════
 // 時鐘
@@ -234,6 +235,27 @@ function jsonp(url, cb){
     try{delete window[name];}catch(ex){}
     try{if(script.parentNode)script.parentNode.removeChild(script);}catch(ex){}
     cb(e,d);
+  }
+  window[name]=function(d){finish(null,d);};
+  script.onerror=function(){finish(new Error('script error'),null);};
+  script.src=url+(url.indexOf('?')>=0?'&':'?')+'callback='+name;
+  document.head.appendChild(script);
+}
+
+// ════════════════════════════════════
+// JSONP Silent（背景寫入用，timeout 30 秒）
+// ════════════════════════════════════
+function jsonpSilent(url, cb){
+  var name='_cks_'+Date.now()+'_'+Math.floor(Math.random()*9999);
+  var done=false;
+  var script=document.createElement('script');
+  var timer=setTimeout(function(){finish(new Error('timeout'),null);},30000);
+  function finish(e,d){
+    if(done)return;done=true;
+    clearTimeout(timer);
+    try{delete window[name];}catch(ex){}
+    try{if(script.parentNode)script.parentNode.removeChild(script);}catch(ex){}
+    if(cb)cb(e,d);
   }
   window[name]=function(d){finish(null,d);};
   script.onerror=function(){finish(new Error('script error'),null);};
@@ -407,33 +429,64 @@ function doLookup(studentId){
   for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
   var autoColor=colors[ci%colors.length];
 
-  // 進度提示：GAS 寫入需要 8~14 秒，先顯示等待訊息
-  var waitMsgs=['確認中，請稍候...','查詢資料庫中...','寫入出席紀錄...'];
-  var wIdx=0;
-  typeText(waitMsgs[0]+'\n學號：'+studentId);
-  var waitTimer=setInterval(function(){
-    wIdx=(wIdx+1)%waitMsgs.length;
-    typeText(waitMsgs[wIdx]+'\n學號：'+studentId);
-  },4000);
-
-  // 一個請求：查名 + 寫入（write=1）
-  var url = GAS_URL
+  // ── 步驟1：快速查名（不寫入，~1秒）────────────────────────
+  var lookupUrl = GAS_URL
     + '?action=lookupStudent'
-    + '&studentId=' + encodeURIComponent(studentId)
-    + '&sid='       + encodeURIComponent(SESSION_ID)
-    + '&color='     + encodeURIComponent(autoColor)
-    + '&write=1';
+    + '&studentId=' + encodeURIComponent(studentId);
 
-  jsonp(url, function(err, data){
-    clearInterval(waitTimer); // 停止等待提示
-
-    // 連線失敗
-    if(err){
-      setFace('');setStatus('err','連線失敗');
-      typeText('連線逾時，請再試一次\n（或用手動輸入）');
-      speak('連線失敗，請再試一次。', function(){setStatus('on','就緒');});
+  jsonp(lookupUrl, function(err, data){
+    if(err || !data || !data.ok || !data.name){
+      setFace('');setStatus('err','找不到');
+      typeText(rand(NOTFOUND));
+      speak('找不到這個學號，請再說一次。', function(){setStatus('on','就緒');});
       return;
     }
+
+    var sName = data.name;
+
+    // ── 步驟2：背景寫入（慢，~10秒，不阻擋 UI）─────────────
+    // 先對防重複做本地記憶，避免同一堂課重複喊名
+    if(checkedSet[SESSION_ID+'_'+studentId]){
+      setFace('');setStatus('on','已簽到');
+      typeText(sName+'，你已經簽到了！\n不要重複喔！');
+      speak(sName+'，你已經簽到過了！', function(){setFace('');setStatus('on','就緒');});
+      return;
+    }
+    checkedSet[SESSION_ID+'_'+studentId] = true;
+
+    // 立刻顯示成功（UI 不等寫入）
+    setFace('happy');
+    typeText(rand(SUCCESS).replace('{n}', sName));
+    speak(sName+'，簽到成功！花朵種好了！', function(){setFace('');setStatus('on','就緒');});
+    addTag(sName);
+    checkinCount++;
+    document.getElementById('cntN').textContent = checkinCount;
+
+    // 背景靜默寫入 voiceCheckin（用獨立 JSONP，不影響主流程）
+    var writeUrl = GAS_URL
+      + '?action=voiceCheckin'
+      + '&sid='       + encodeURIComponent(SESSION_ID)
+      + '&studentId=' + encodeURIComponent(studentId)
+      + '&color='     + encodeURIComponent(autoColor);
+
+    jsonpSilent(writeUrl, function(werr, wdata){
+      if(!werr && wdata && wdata.ok){
+        console.log('✅ 寫入成功：', sName);
+        // 更新正確人數
+        setTimeout(function(){
+          jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
+            if(!e2&&d2&&d2.ok){
+              document.getElementById('cntN').textContent    = d2.presentCount||checkinCount;
+              document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
+            }
+          });
+        }, 1000);
+      } else {
+        console.warn('⚠️ 背景寫入失敗：', werr, wdata);
+      }
+    });
+  });
+}
 
     // 找不到學號
     if(!data || !data.ok || !data.name){
@@ -444,44 +497,6 @@ function doLookup(studentId){
     }
 
     var sName = data.name;
-
-    // 已重複簽到
-    if(data.alreadySigned){
-      setFace('');setStatus('on','已簽到');
-      typeText(sName+'，你已經簽到了！\n不要重複喔！');
-      speak(sName+'，你已經簽到過了！', function(){setFace('');setStatus('on','就緒');});
-      return;
-    }
-
-    // ✅ 寫入成功（written=true）或 writeError 時都算找到人了
-    if(data.writeError){
-      // 找到人但寫入失敗，顯示警告
-      console.warn('寫入失敗：', data.writeError);
-      setFace('');setStatus('err','寫入失敗');
-      typeText(sName+'，找到了！\n但紀錄寫入失敗，請通知老師');
-      speak(sName+'，找到了，但系統寫入失敗，請通知老師。');
-      return;
-    }
-
-    // 完全成功
-    setFace('happy');
-    typeText(rand(SUCCESS).replace('{n}', sName));
-    speak(sName+'，簽到成功！花朵種好了！', function(){setFace('');setStatus('on','就緒');});
-    addTag(sName);
-    checkinCount++;
-    document.getElementById('cntN').textContent = checkinCount;
-
-    // 2秒後更新正確人數
-    setTimeout(function(){
-      jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
-        if(!e2&&d2&&d2.ok){
-          document.getElementById('cntN').textContent    = d2.presentCount||checkinCount;
-          document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
-        }
-      });
-    }, 2000);
-  });
-}
 
 function addTag(name){
   var list=document.getElementById('tags');
