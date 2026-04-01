@@ -126,7 +126,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
   <div class="statusbar">
     <span><span class="dot" id="dot"></span><span id="statusTxt">連線中</span></span>
     <span id="cntDisplay">已簽到 <b id="cntN">0</b><span id="cntTotal">/0</span> 人</span>
-    <button class="diag-btn" onclick="runDiag()">診斷</button>
+    <span>
+      <button class="diag-btn" onclick="exportCSV()" title="下載本地出席備份">💾</button>
+      <button class="diag-btn" onclick="runDiag()">診斷</button>
+    </span>
   </div>
 </div>
 
@@ -142,6 +145,7 @@ var isListening  = false;
 var isSpeaking   = false;
 var recognition  = null;
 var checkedSet   = {};  // 本地防重複記憶 { "場次ID_學號": true }
+var localLog     = [];  // 本地出席備份陣列
 
 // ════════════════════════════════════
 // 時鐘
@@ -464,6 +468,15 @@ function doLookup(studentId){
     }
     checkedSet[SESSION_ID+'_'+studentId] = true;
 
+    // 本地備份（無論 GAS 成不成功都先存）
+    localLog.push({
+      time:      new Date().toLocaleString('zh-TW'),
+      sid:       SESSION_ID,
+      studentId: studentId,
+      name:      sName,
+      color:     autoColor
+    });
+
     // 立刻顯示成功（UI 不等寫入）
     setFace('happy');
     typeText(rand(SUCCESS).replace('{n}', sName));
@@ -472,17 +485,17 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // 背景靜默寫入 voiceCheckin（用獨立 JSONP，不影響主流程）
+    // 背景寫入：用 fetch no-cors（穿透 GAS 重導向，fire-and-forget）
     var writeUrl = GAS_URL
-      + '?action=voiceCheckin'
+      + '?action=quickCheckin'
       + '&sid='       + encodeURIComponent(SESSION_ID)
       + '&studentId=' + encodeURIComponent(studentId)
+      + '&name='      + encodeURIComponent(sName)
       + '&color='     + encodeURIComponent(autoColor);
 
-    jsonpSilent(writeUrl, function(werr, wdata){
-      if(!werr && wdata && wdata.ok){
-        console.log('✅ 寫入成功：', sName);
-        // 更新正確人數
+    fetch(writeUrl, { mode: 'no-cors' })
+      .then(function(){
+        console.log('✅ 背景寫入已送出：', sName);
         setTimeout(function(){
           jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
             if(!e2&&d2&&d2.ok){
@@ -490,11 +503,9 @@ function doLookup(studentId){
               document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
             }
           });
-        }, 1000);
-      } else {
-        console.warn('⚠️ 背景寫入失敗：', werr, wdata);
-      }
-    });
+        }, 3000);
+      })
+      .catch(function(e){ console.warn('背景寫入 fetch 失敗（本地已備份）', e); });
   });
 }
 
@@ -505,6 +516,28 @@ function addTag(name){
   list.insertBefore(t,list.firstChild);
   setTimeout(function(){t.classList.remove('new');},2000);
   while(list.children.length>6)list.removeChild(list.lastChild);
+}
+
+// ════════════════════════════════════
+// 本地備份匯出 CSV
+// ════════════════════════════════════
+function exportCSV(){
+  if(!localLog.length){
+    typeText('本課尚無簽到紀錄');
+    return;
+  }
+  var header = '時間,場次ID,學號,姓名\n';
+  var rows   = localLog.map(function(r){
+    return [r.time, r.sid, r.studentId, r.name].join(',');
+  }).join('\n');
+  var blob = new Blob(['\uFEFF'+header+rows], {type:'text/csv;charset=utf-8'});
+  var url  = URL.createObjectURL(blob);
+  var a    = document.createElement('a');
+  a.href   = url;
+  a.download = 'attendance_'+SESSION_ID+'_'+Date.now()+'.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  typeText('✅ 已下載本地備份\n共 '+localLog.length+' 筆');
 }
 
 // ════════════════════════════════════
