@@ -44,14 +44,12 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 /* 故障動畫 */
 @keyframes glitch{0%,94%,100%{transform:translateX(0);filter:none}95%{transform:translateX(-3px);filter:hue-rotate(90deg)}97%{transform:translateX(3px);filter:hue-rotate(-90deg)}}
 .robot-svg{animation:glitch 9s infinite}
-/* 擺動 */
-@keyframes sway{0%,100%{transform:rotate(-1.5deg)}50%{transform:rotate(1.5deg)}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <div class="topbar">
-    <span id="topTitle">GN432 // ROLL-CALL SYS v3.0</span>
+    <span id="topTitle">GN432 // ROLL-CALL SYS v3.1</span>
     <span id="clock">--:--:--</span>
   </div>
 
@@ -111,7 +109,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
 <script>
 // ════════════════════════════════════
-// 設定（固定，不需修改）
+// 設定
 // ════════════════════════════════════
 var GAS_URL    = 'https://script.google.com/macros/s/AKfycbwCVcFSTRhZSH3zse5WBFyR9HqZPjqhDpTTpephd3DrLZ1P_3LMYcOoSU0Q64Ya3WiD/exec';
 var SESSION_ID = '';
@@ -265,8 +263,16 @@ function confirmSession(){
   typeText('場次：'+SESSION_ID+'\n大家好！我是點名小CK！\n請按按鈕說出學號！');
   speak('大家好！我是點名小CK！請說出你的學號完成點名！');
   if(GARDEN_URL) addGardenBtn();
-}
 
+  // 顯示目前人數
+  document.getElementById('cntTotal').textContent = '/'+( document.querySelector('#scArea') ? 0 : 0);
+  jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
+    if(!e2&&d2&&d2.ok){
+      document.getElementById('cntN').textContent    = d2.presentCount||0;
+      document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
+    }
+  });
+}
 
 function addGardenBtn(){
   var existing=document.getElementById('gardenBtn');
@@ -357,7 +363,6 @@ function resetBtn(){
 // ════════════════════════════════════
 var CONFIRMS=['好的！查名單中...','收到！確認中...','嗯嗯！等我找一下...','好！查詢中...'];
 var SUCCESS=['{n}，簽到成功！花朵種好了！','歡迎 {n}！出席紀錄完成！','{n}！叮！登記了！','收到！{n} 已到，辛苦了！'];
-var ALREADY=['{n}，你剛才已經簽到了！','同學，你已經在名單上了！','{n}，不要重複簽到啦！'];
 var NOTFOUND=['找不到這個學號，再說一次？','嗯...名單裡沒有，再試試？','奇怪，沒找到，確認學號後再說'];
 
 function rand(a){return a[Math.floor(Math.random()*a.length)];}
@@ -365,100 +370,84 @@ function rand(a){return a[Math.floor(Math.random()*a.length)];}
 function processCheckin(studentId){
   setStatus('on','處理中');
   typeText(rand(CONFIRMS)+'\n學號：'+studentId);
-
-  // 步驟0：確認場次仍有效（避免使用過期的SESSION_ID）
-  jsonp(GAS_URL+'?action=getOpenSession', function(se,sd){
-    if(!se && sd && sd.ok && sd.sessionId){
-      SESSION_ID = sd.sessionId;  // 更新為最新場次
-      if(sd.gardenUrl) GARDEN_URL = sd.gardenUrl;
-    }
-    doLookup(studentId);
-  });
+  doLookup(studentId);
 }
 
+// ════════════════════════════════════
+// ✅ 核心修正：lookupStudent + write=1
+//    一個 JSONP 同時查名＋寫入出席紀錄
+// ════════════════════════════════════
 function doLookup(studentId){
+  // 根據學號產生固定顏色
   var colors=['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
-  var ci=0; for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
+  var ci=0;
+  for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
   var autoColor=colors[ci%colors.length];
 
-  // Step1: 查名字（已知可用）
-  jsonp(GAS_URL+'?action=lookupStudent&studentId='+encodeURIComponent(studentId), function(err,data){
-    if(err || !data || !data.ok || !data.name){
-      setFace('');setStatus('err','找不到');
-      typeText(rand(NOTFOUND));
-      speak('找不到這個學號，請再說一次。',function(){setStatus('on','就緒');});
+  // 一個請求：查名 + 寫入（write=1）
+  var url = GAS_URL
+    + '?action=lookupStudent'
+    + '&studentId=' + encodeURIComponent(studentId)
+    + '&sid='       + encodeURIComponent(SESSION_ID)
+    + '&color='     + encodeURIComponent(autoColor)
+    + '&write=1';
+
+  jsonp(url, function(err, data){
+    // 連線失敗
+    if(err){
+      setFace('');setStatus('err','連線失敗');
+      typeText('連線失敗，請再試一次');
+      speak('連線失敗，請再試一次。', function(){setStatus('on','就緒');});
       return;
     }
-    var sName=data.name;
-    var courseId=data.courseId||'GN432';
 
-    // 馬上顯示成功
+    // 找不到學號
+    if(!data || !data.ok || !data.name){
+      setFace('');setStatus('err','找不到');
+      typeText(rand(NOTFOUND));
+      speak('找不到這個學號，請再說一次。', function(){setStatus('on','就緒');});
+      return;
+    }
+
+    var sName = data.name;
+
+    // 已重複簽到
+    if(data.alreadySigned){
+      setFace('');setStatus('on','已簽到');
+      typeText(sName+'，你已經簽到了！\n不要重複喔！');
+      speak(sName+'，你已經簽到過了！', function(){setFace('');setStatus('on','就緒');});
+      return;
+    }
+
+    // ✅ 寫入成功（written=true）或 writeError 時都算找到人了
+    if(data.writeError){
+      // 找到人但寫入失敗，顯示警告
+      console.warn('寫入失敗：', data.writeError);
+      setFace('');setStatus('err','寫入失敗');
+      typeText(sName+'，找到了！\n但紀錄寫入失敗，請通知老師');
+      speak(sName+'，找到了，但系統寫入失敗，請通知老師。');
+      return;
+    }
+
+    // 完全成功
     setFace('happy');
-    typeText(rand(SUCCESS).replace('{n}',sName));
-    speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
+    typeText(rand(SUCCESS).replace('{n}', sName));
+    speak(sName+'，簽到成功！花朵種好了！', function(){setFace('');setStatus('on','就緒');});
     addTag(sName);
     checkinCount++;
-    document.getElementById('cntN').textContent=checkinCount;
+    document.getElementById('cntN').textContent = checkinCount;
 
-    // Step2: 快速佇列（ScriptProperties，<0.5秒，JSONP一定成功）
-    var writeUrl=GAS_URL+'?action=simpleCheckin'
-      +'&sid='+encodeURIComponent(SESSION_ID)
-      +'&studentId='+encodeURIComponent(studentId)
-      +'&studentName='+encodeURIComponent(sName)
-      +'&courseId='+encodeURIComponent(courseId)
-      +'&color='+encodeURIComponent(autoColor);
-
-    jsonp(writeUrl, function(we,wd){
-      console.log('simpleCheckin result:', JSON.stringify(wd), we);
-      if(!we && wd && wd.ok){
-        console.log('✅ 寫入成功！', wd.studentName);
-        setTimeout(function(){
-          jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
-            if(!e2&&d2&&d2.ok){
-              document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
-              document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
-            }
-          });
-        },65000); // 65秒後確認（等觸發器跑完）
-      } else {
-        console.warn('queue failed:', we, wd);
-      }
-    });
+    // 2秒後更新正確人數
+    setTimeout(function(){
+      jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
+        if(!e2&&d2&&d2.ok){
+          document.getElementById('cntN').textContent    = d2.presentCount||checkinCount;
+          document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
+        }
+      });
+    }, 2000);
   });
 }
-
-
-function handleCheckinData(data, studentId){
-  if(!data.ok && !data.alreadySigned){
-    setFace('');setStatus('err','找不到');
-    typeText(rand(NOTFOUND));
-    speak('找不到這個學號，請再說一次。',function(){setStatus('on','就緒');});
-    return;
-  }
-  if(data.alreadySigned){
-    var nm=data.studentName||studentId;
-    setFace('');setStatus('on','已簽到');
-    typeText(nm+'，你已經簽到了！');
-    speak(nm+'，你已經簽到過了！',function(){setStatus('on','就緒');});
-    return;
-  }
-  var sName=data.studentName||studentId;
-  setFace('happy');
-  typeText(rand(SUCCESS).replace('{n}',sName));
-  speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
-  addTag(sName);
-  checkinCount++;
-  document.getElementById('cntN').textContent=checkinCount;
-  setTimeout(function(){
-    jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
-      if(!e2&&d2&&d2.ok){
-        document.getElementById('cntN').textContent=d2.presentCount||checkinCount;
-        document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
-      }
-    });
-  },3000);
-}
-
 
 function addTag(name){
   var list=document.getElementById('tags');
@@ -478,8 +467,13 @@ function runDiag(){
   jsonp(GAS_URL+'?action=getOpenSession',function(err,data){
     if(err){
       typeText('GAS 連線失敗\n錯誤：'+err.message);
+      setStatus('err','連線失敗');
+    } else if(data && data.ok){
+      typeText('✅ 連線正常！\n場次：'+(data.sessionId||'無')+'\n已到：'+(data.presentCount||0)+'/'+(data.totalCount||0));
+      setStatus('on','連線正常');
     } else {
-      typeText('GAS OK！\n'+JSON.stringify(data).substring(0,100));
+      typeText('GAS 回應：\n'+(data?JSON.stringify(data).substring(0,80):'null'));
+      setStatus('err','無場次');
     }
   });
 }
