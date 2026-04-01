@@ -227,7 +227,7 @@ function jsonp(url, cb){
   var name='_ck_'+Date.now()+'_'+Math.floor(Math.random()*9999);
   var done=false;
   var script=document.createElement('script');
-  var timer=setTimeout(function(){finish(new Error('timeout'),null);},15000);
+  var timer=setTimeout(function(){finish(new Error('timeout'),null);},28000);
   function finish(e,d){
     if(done)return;done=true;
     clearTimeout(timer);
@@ -407,6 +407,15 @@ function doLookup(studentId){
   for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
   var autoColor=colors[ci%colors.length];
 
+  // 進度提示：GAS 寫入需要 8~14 秒，先顯示等待訊息
+  var waitMsgs=['確認中，請稍候...','查詢資料庫中...','寫入出席紀錄...'];
+  var wIdx=0;
+  typeText(waitMsgs[0]+'\n學號：'+studentId);
+  var waitTimer=setInterval(function(){
+    wIdx=(wIdx+1)%waitMsgs.length;
+    typeText(waitMsgs[wIdx]+'\n學號：'+studentId);
+  },4000);
+
   // 一個請求：查名 + 寫入（write=1）
   var url = GAS_URL
     + '?action=lookupStudent'
@@ -416,10 +425,12 @@ function doLookup(studentId){
     + '&write=1';
 
   jsonp(url, function(err, data){
+    clearInterval(waitTimer); // 停止等待提示
+
     // 連線失敗
     if(err){
       setFace('');setStatus('err','連線失敗');
-      typeText('連線失敗，請再試一次');
+      typeText('連線逾時，請再試一次\n（或用手動輸入）');
       speak('連線失敗，請再試一次。', function(){setStatus('on','就緒');});
       return;
     }
