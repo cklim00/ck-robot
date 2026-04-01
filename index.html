@@ -44,6 +44,15 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 /* 故障動畫 */
 @keyframes glitch{0%,94%,100%{transform:translateX(0);filter:none}95%{transform:translateX(-3px);filter:hue-rotate(90deg)}97%{transform:translateX(3px);filter:hue-rotate(-90deg)}}
 .robot-svg{animation:glitch 9s infinite}
+/* 手動輸入區 */
+.manual-row{display:flex;gap:6px;width:calc(100% - 20px);max-width:360px;align-items:center}
+.manual-input{flex:1;background:#071208;border:2px solid #1a7a08;color:#39ff14;padding:5px 10px;font-family:'VT323',monospace;font-size:24px;letter-spacing:2px;outline:none;transition:border-color .2s}
+.manual-input:focus{border-color:#39ff14;box-shadow:0 0 8px rgba(57,255,20,.25)}
+.manual-input::placeholder{color:#1a4a08;font-size:16px}
+.manual-btn{background:#0d3d04;border:2px solid #39ff14;color:#39ff14;font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 10px;cursor:pointer;white-space:nowrap;box-shadow:3px 3px 0 #050f03;transition:all .1s}
+.manual-btn:hover{box-shadow:1px 1px 0 #050f03;transform:translate(2px,2px)}
+.manual-toggle{background:transparent;border:1px solid #1a4a08;color:#1a7a08;font-family:'VT323',monospace;font-size:14px;padding:2px 8px;cursor:pointer;transition:all .2s}
+.manual-toggle:hover{color:#39ff14;border-color:#39ff14}
 </style>
 </head>
 <body>
@@ -96,6 +105,20 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     </div>
 
     <button class="mic-btn" id="micBtn" onclick="startListen()">[ 🎤 開始說話 ]</button>
+
+    <!-- 手動輸入學號（備用） -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;width:100%">
+      <button class="manual-toggle" id="manualToggleBtn" onclick="toggleManual()">⌨ 手動輸入學號</button>
+      <div id="manualArea" style="display:none;width:calc(100% - 20px);max-width:360px;animation:fadeIn .2s">
+        <div class="manual-row">
+          <input class="manual-input" id="manualIdInput" type="tel" maxlength="10"
+            placeholder="輸入學號，按 Enter"
+            onkeydown="if(event.key==='Enter')submitManual()"
+            oninput="this.value=this.value.replace(/[^0-9]/g,'')">
+          <button class="manual-btn" onclick="submitManual()">確認</button>
+        </div>
+      </div>
+    </div>
 
     <div class="tags" id="tags"></div>
   </div>
@@ -479,10 +502,43 @@ function runDiag(){
 }
 
 // ════════════════════════════════════
+// 手動輸入學號
+// ════════════════════════════════════
+function toggleManual(){
+  var area = document.getElementById('manualArea');
+  var btn  = document.getElementById('manualToggleBtn');
+  var open = area.style.display === 'none';
+  area.style.display = open ? 'flex' : 'none';
+  area.style.flexDirection = 'column';
+  btn.textContent = open ? '✕ 關閉手動輸入' : '⌨ 手動輸入學號';
+  btn.style.color = open ? '#39ff14' : '#1a7a08';
+  btn.style.borderColor = open ? '#39ff14' : '#1a4a08';
+  if(open){
+    setTimeout(function(){
+      var inp = document.getElementById('manualIdInput');
+      if(inp){ inp.focus(); inp.value=''; }
+    }, 50);
+  }
+}
+
+function submitManual(){
+  if(!SESSION_ID){ typeText('請先等待場次載入\n或手動輸入場次ID'); return; }
+  var inp = document.getElementById('manualIdInput');
+  if(!inp) return;
+  var val = inp.value.replace(/[^0-9]/g,'').trim();
+  if(val.length < 5){ typeText('學號太短，請再確認'); inp.focus(); return; }
+  inp.value = '';
+  inp.focus();
+  processCheckin(val);
+}
+
+// ════════════════════════════════════
 // 空白鍵觸發
 // ════════════════════════════════════
 document.addEventListener('keydown',function(e){
-  if(e.code==='Space'&&!isListening&&!isSpeaking){e.preventDefault();startListen();}
+  var active = document.activeElement;
+  var isTyping = active && (active.tagName==='INPUT'||active.tagName==='TEXTAREA');
+  if(e.code==='Space'&&!isListening&&!isSpeaking&&!isTyping){e.preventDefault();startListen();}
 });
 
 // ════════════════════════════════════
