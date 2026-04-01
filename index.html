@@ -401,7 +401,7 @@ function doLookup(studentId){
     document.getElementById('cntN').textContent=checkinCount;
 
     // Step2: 快速佇列（ScriptProperties，<0.5秒，JSONP一定成功）
-    var writeUrl=GAS_URL+'?action=queueCheckin'
+    var writeUrl=GAS_URL+'?action=simpleCheckin'
       +'&sid='+encodeURIComponent(SESSION_ID)
       +'&studentId='+encodeURIComponent(studentId)
       +'&studentName='+encodeURIComponent(sName)
@@ -409,9 +409,9 @@ function doLookup(studentId){
       +'&color='+encodeURIComponent(autoColor);
 
     jsonp(writeUrl, function(we,wd){
-      console.log('queueCheckin result:', JSON.stringify(wd), we);
+      console.log('simpleCheckin result:', JSON.stringify(wd), we);
       if(!we && wd && wd.ok){
-        console.log('✅ 已佇列！1分鐘內寫入 Sheet');
+        console.log('✅ 寫入成功！', wd.studentName);
         setTimeout(function(){
           jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
             if(!e2&&d2&&d2.ok){
