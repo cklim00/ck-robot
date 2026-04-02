@@ -444,6 +444,7 @@ function doLookup(studentId){
     + '&color='     + encodeURIComponent(autoColor);
 
   jsonp(url, function(err, data){
+    console.log('GAS回傳：', JSON.stringify(data), ' / err：', err ? err.message : 'null');
     if(err || !data || !data.ok || !data.name){
       setFace(''); setStatus('err', '找不到');
       typeText(rand(NOTFOUND));
