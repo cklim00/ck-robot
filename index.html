@@ -458,16 +458,13 @@ function doLookup(studentId){
     return;
   }
 
-  // ✅ 一個 JSONP 請求：查名 + 寫入同時完成（GAS 內部處理，無 ORB 問題）
+  // ── Step 1：JSONP 查名（純讀，不觸發 ORB）
   var lookupUrl = GAS_URL
     + '?action=lookupStudent'
-    + '&studentId=' + encodeURIComponent(studentId)
-    + '&sid='       + encodeURIComponent(SESSION_ID)
-    + '&color='     + encodeURIComponent(autoColor);
+    + '&studentId=' + encodeURIComponent(studentId);
 
   jsonp(lookupUrl, function(err, data){
-    console.log('查名+寫入回傳：', JSON.stringify(data), err ? err.message : '');
-
+    console.log('查名回傳：', JSON.stringify(data));
     if(err || !data || !data.ok || !data.name){
       setFace(''); setStatus('err', '找不到');
       typeText(rand(NOTFOUND));
@@ -475,24 +472,15 @@ function doLookup(studentId){
       return;
     }
 
-    var sName = data.name;
+    var sName    = data.name;
+    var courseId = data.courseId || 'GN432';
 
-    if(data.alreadySigned){
-      typeText(sName + '，你已簽到過囉！');
-      speak(sName + '，你已經簽到過了！', function(){ setFace(''); setStatus('on', '就緒'); });
-      checkedSet[key] = true;
-      return;
-    }
-
+    // 立刻顯示成功
     checkedSet[key] = true;
     localLog.push({
       time: new Date().toLocaleString('zh-TW'),
-      sid: SESSION_ID,
-      studentId: studentId,
-      name: sName,
-      color: autoColor
+      sid: SESSION_ID, studentId: studentId, name: sName, color: autoColor
     });
-
     setFace('happy');
     typeText(rand(SUCCESS).replace('{n}', sName));
     speak(sName + '，簽到成功！花朵種好了！', function(){ setFace(''); setStatus('on', '就緒'); });
@@ -500,15 +488,28 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // 5 秒後同步最新人數
-    setTimeout(function(){
-      jsonp(GAS_URL + '?action=getOpenSession', function(e3, d3){
-        if(!e3 && d3 && d3.ok){
-          document.getElementById('cntN').textContent     = d3.presentCount || checkinCount;
-          document.getElementById('cntTotal').textContent = '/' + (d3.totalCount || 0);
-        }
-      });
-    }, 5000);
+    // ── Step 2：<img> 寫入（quickCheckin，帶 name 參數，GAS 確認可收到）
+    var writeUrl = GAS_URL
+      + '?action=quickCheckin'
+      + '&sid='       + encodeURIComponent(SESSION_ID)
+      + '&studentId=' + encodeURIComponent(studentId)
+      + '&name='      + encodeURIComponent(sName)
+      + '&courseId='  + encodeURIComponent(courseId)
+      + '&color='     + encodeURIComponent(autoColor);
+
+    var img = new Image();
+    img.onload = img.onerror = function(){
+      console.log('✅ 寫入請求已送達 GAS：', sName);
+      setTimeout(function(){
+        jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
+          if(!e2 && d2 && d2.ok){
+            document.getElementById('cntN').textContent     = d2.presentCount || checkinCount;
+            document.getElementById('cntTotal').textContent = '/' + (d2.totalCount || 0);
+          }
+        });
+      }, 5000);
+    };
+    img.src = writeUrl;
   });
 }
 function addTag(name){
