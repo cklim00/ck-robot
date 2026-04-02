@@ -502,7 +502,7 @@ function doLookup(studentId){
       + '&courseId='  + encodeURIComponent(courseId)
       + '&color='     + encodeURIComponent(autoColor);
 
-    jsonpSilent(writeUrl, function(err, data){
+    jsonp(writeUrl, function(err, data){
       if(!err && data && data.ok){
         console.log('✅ 寫入成功：', sName);
       } else {
