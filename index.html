@@ -56,6 +56,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 </style>
 </head>
 <body>
+<iframe name="ck_write_frame" style="display:none"></iframe>
 <div class="wrap">
   <div class="topbar">
     <span id="topTitle">GN432 // ROLL-CALL SYS v3.2</span>
@@ -488,19 +489,31 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // ── Step 2：fetch no-cors 寫入（不讀回應，ORB 不擋）
-    var writeUrl = GAS_URL
-      + '?action=ckReg'
-      + '&sid='       + encodeURIComponent(SESSION_ID)
-      + '&studentId=' + encodeURIComponent(studentId)
-      + '&name='      + encodeURIComponent(sName)
-      + '&courseId='  + encodeURIComponent(courseId)
-      + '&color='     + encodeURIComponent(autoColor);
+    // ── Step 2：隱藏表單寫入（Form Submit，跨域完全不受限）
+    var form = document.createElement('form');
+    form.method = 'GET';
+    form.action = GAS_URL;
+    form.target = 'ck_write_frame';  // 送到隱藏 iframe，不影響畫面
 
-    fetch(writeUrl, { mode: 'no-cors' })
-      .then(function(){ console.log('✅ 寫入已送出：', sName); })
-      .catch(function(e2){ console.warn('⚠️ fetch 失敗：', e2.message); });
-
+    var fields = {
+      action:    'quickCheckin',
+      sid:       SESSION_ID,
+      studentId: studentId,
+      name:      sName,
+      courseId:  courseId,
+      color:     autoColor
+    };
+    Object.keys(fields).forEach(function(k){
+      var inp = document.createElement('input');
+      inp.type = 'hidden';
+      inp.name = k;
+      inp.value = fields[k];
+      form.appendChild(inp);
+    });
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+    console.log('✅ 表單已送出：', sName);
     // 5 秒後同步人數
     setTimeout(function(){
       jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
