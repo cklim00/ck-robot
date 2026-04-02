@@ -499,10 +499,8 @@ function doLookup(studentId){
       + '&color='     + encodeURIComponent(autoColor);
 
     fetch(writeUrl)
-      .then(function(r){ return r.json(); })
-      .then(function(d){
-        if(d.ok) console.log('✅ 寫入成功：', sName);
-        else console.warn('⚠️ 寫入失敗：', JSON.stringify(d));
+      .then(function(r){
+        console.log('✅ 寫入已送出：', sName, ' HTTP:', r.status);
       })
       .catch(function(e2){ console.warn('⚠️ fetch 錯誤：', e2.message); });
     // 5 秒後同步人數
