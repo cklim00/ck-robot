@@ -375,9 +375,12 @@ function startListen(){
     var heard = '';
     for(var i = 0; i < e.results[0].length; i++){
       var t = e.results[0][i].transcript.trim();
-      var n = t.replace(/[^0-9]/g, '');
+      // ✅ 先把中文數字轉成阿拉伯數字
+      var converted = convertChineseNum(t);
+      var n = converted.replace(/[^0-9]/g, '');
+      console.log('語音原文：', t, '→ 轉換：', converted, '→ 數字：', n);
       if(n.length >= 6){ heard = n; break; }
-      heard = t;
+      heard = n || t;
     }
     processCheckin(heard);
   };
@@ -401,6 +404,19 @@ function resetBtn(){
   var btn = document.getElementById('micBtn');
   btn.classList.remove('rec');
   btn.textContent = '[ 🎤 開始說話 ]';
+}
+
+// ════════════════════════════════════
+// 中文數字 → 阿拉伯數字轉換
+// ════════════════════════════════════
+function convertChineseNum(str){
+  var map = {
+    '零':'0','〇':'0','一':'1','二':'2','三':'3','四':'4',
+    '五':'5','六':'6','七':'7','八':'8','九':'9',
+    '０':'0','１':'1','２':'2','３':'3','４':'4',
+    '５':'5','６':'6','７':'7','８':'8','９':'9'
+  };
+  return str.split('').map(function(c){ return map[c] !== undefined ? map[c] : c; }).join('');
 }
 
 // ════════════════════════════════════
