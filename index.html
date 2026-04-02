@@ -493,7 +493,7 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // ── Step 2：<img> tag 寫入（GAS 確認可收到，fire-and-forget）
+    // ── Step 2：JSONP 寫入（唯一可靠的跨域機制，fire-and-forget）
     var writeUrl = GAS_URL
       + '?action=ckReg'
       + '&sid='       + encodeURIComponent(SESSION_ID)
@@ -502,11 +502,13 @@ function doLookup(studentId){
       + '&courseId='  + encodeURIComponent(courseId)
       + '&color='     + encodeURIComponent(autoColor);
 
-    var img = new Image();
-    img.onload = img.onerror = function(){
-      console.log('✅ 寫入請求已送達 GAS：', sName);
-    };
-    img.src = writeUrl;
+    jsonpSilent(writeUrl, function(err, data){
+      if(!err && data && data.ok){
+        console.log('✅ 寫入成功：', sName);
+      } else {
+        console.warn('⚠️ 寫入回傳：', JSON.stringify(data), err ? err.message : '');
+      }
+    });
 
     // 5 秒後同步最新人數
     setTimeout(function(){
