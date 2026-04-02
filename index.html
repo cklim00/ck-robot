@@ -304,11 +304,13 @@ function confirmSession(){
   var inp = document.getElementById('sidInput');
   if(!inp || !inp.value.trim()) return;
   SESSION_ID = inp.value.trim();
+  // ✅ 每次確認場次時，強制重建 GARDEN_URL，確保指向當前 SESSION_ID
+  GARDEN_URL = GAS_URL + '?garden=' + SESSION_ID;
   var a = document.getElementById('scArea'); if(a) a.remove();
   setStatus('on', '就緒'); setFace('');
   typeText('場次：'+SESSION_ID+'\n大家好！我是點名小CK！\n請按按鈕說出學號！');
   speak('大家好！我是點名小CK！請說出你的學號完成點名！');
-  if(GARDEN_URL) addGardenBtn();
+  addGardenBtn();
   // 顯示目前人數
   jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
     if(!e2 && d2 && d2.ok){
@@ -343,10 +345,13 @@ function confirmManual(){
   var inp = document.getElementById('manSid');
   if(!inp || !inp.value.trim()) return;
   SESSION_ID = inp.value.trim();
+  // ✅ 手動輸入時也同步更新 GARDEN_URL
+  GARDEN_URL = GAS_URL + '?garden=' + SESSION_ID;
   var p = inp.parentNode; if(p) p.remove();
   setStatus('on', '手動模式');
   typeText('好！場次：'+SESSION_ID+'\n按下按鈕說出學號！');
   speak('好的！請按按鈕說出你的學號！');
+  addGardenBtn();
 }
 
 // ════════════════════════════════════
