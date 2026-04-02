@@ -458,13 +458,15 @@ function doLookup(studentId){
     return;
   }
 
-  // ── Step 1：JSONP 查名（唯讀，不觸發 ORB）
+  // ✅ 一個 JSONP 請求：查名 + 寫入同時完成（GAS 內部處理，無 ORB 問題）
   var lookupUrl = GAS_URL
     + '?action=lookupStudent'
-    + '&studentId=' + encodeURIComponent(studentId);
+    + '&studentId=' + encodeURIComponent(studentId)
+    + '&sid='       + encodeURIComponent(SESSION_ID)
+    + '&color='     + encodeURIComponent(autoColor);
 
   jsonp(lookupUrl, function(err, data){
-    console.log('查名回傳：', JSON.stringify(data), err ? err.message : '');
+    console.log('查名+寫入回傳：', JSON.stringify(data), err ? err.message : '');
 
     if(err || !data || !data.ok || !data.name){
       setFace(''); setStatus('err', '找不到');
@@ -473,10 +475,15 @@ function doLookup(studentId){
       return;
     }
 
-    var sName    = data.name;
-    var courseId = data.courseId || 'GN432';
+    var sName = data.name;
 
-    // 立刻顯示成功（不等寫入）
+    if(data.alreadySigned){
+      typeText(sName + '，你已簽到過囉！');
+      speak(sName + '，你已經簽到過了！', function(){ setFace(''); setStatus('on', '就緒'); });
+      checkedSet[key] = true;
+      return;
+    }
+
     checkedSet[key] = true;
     localLog.push({
       time: new Date().toLocaleString('zh-TW'),
@@ -492,23 +499,6 @@ function doLookup(studentId){
     addTag(sName);
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
-
-    // ── Step 2：JSONP 寫入（唯一可靠的跨域機制，fire-and-forget）
-    var writeUrl = GAS_URL
-      + '?action=ckReg'
-      + '&sid='       + encodeURIComponent(SESSION_ID)
-      + '&studentId=' + encodeURIComponent(studentId)
-      + '&name='      + encodeURIComponent(sName)
-      + '&courseId='  + encodeURIComponent(courseId)
-      + '&color='     + encodeURIComponent(autoColor);
-
-    jsonp(writeUrl, function(err, data){
-      if(!err && data && data.ok){
-        console.log('✅ 寫入成功：', sName);
-      } else {
-        console.warn('⚠️ 寫入回傳：', JSON.stringify(data), err ? err.message : '');
-      }
-    });
 
     // 5 秒後同步最新人數
     setTimeout(function(){
