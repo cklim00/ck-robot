@@ -489,8 +489,8 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // ── Step 2：JSONP 寫入（經過 Vercel Proxy，無跨域問題）
-    var writeUrl = GAS_URL
+    // ── Step 2：fetch 寫入（Vercel 有 CORS，直接 fetch 即可）
+    var writeUrl = 'https://ck-proxy.vercel.app/api/proxy'
       + '?action=quickCheckin'
       + '&sid='       + encodeURIComponent(SESSION_ID)
       + '&studentId=' + encodeURIComponent(studentId)
@@ -498,13 +498,13 @@ function doLookup(studentId){
       + '&courseId='  + encodeURIComponent(courseId)
       + '&color='     + encodeURIComponent(autoColor);
 
-    jsonp(writeUrl, function(wErr, wData){
-      if(!wErr && wData && wData.ok){
-        console.log('✅ 寫入成功：', sName);
-      } else {
-        console.warn('⚠️ 寫入回傳：', JSON.stringify(wData), wErr ? wErr.message : '');
-      }
-    });
+    fetch(writeUrl)
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d.ok) console.log('✅ 寫入成功：', sName);
+        else console.warn('⚠️ 寫入失敗：', JSON.stringify(d));
+      })
+      .catch(function(e2){ console.warn('⚠️ fetch 錯誤：', e2.message); });
     // 5 秒後同步人數
     setTimeout(function(){
       jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
