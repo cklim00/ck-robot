@@ -459,6 +459,9 @@ function doLookup(studentId){
     + '&studentId=' + encodeURIComponent(studentId)
     + '&color='     + encodeURIComponent(autoColor);
 
+  console.log('SESSION_ID：', SESSION_ID, '　studentId：', studentId);
+  console.log('送出URL：', url);
+
   jsonp(url, function(err, data){
     console.log('GAS回傳：', JSON.stringify(data), ' / err：', err ? err.message : 'null');
     if(err || !data || !data.ok || !data.name){
