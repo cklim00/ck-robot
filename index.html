@@ -458,7 +458,7 @@ function doLookup(studentId){
     return;
   }
 
-  // ── Step 1：JSONP 查名（純讀，不觸發 ORB）
+  // ── Step 1：JSONP 查名（唯讀，ORB 允許）
   var lookupUrl = GAS_URL
     + '?action=lookupStudent'
     + '&studentId=' + encodeURIComponent(studentId);
@@ -488,28 +488,28 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // ── Step 2：<img> 寫入（quickCheckin，帶 name 參數，GAS 確認可收到）
+    // ── Step 2：fetch no-cors 寫入（不讀回應，ORB 不擋）
     var writeUrl = GAS_URL
-      + '?action=quickCheckin'
+      + '?action=ckReg'
       + '&sid='       + encodeURIComponent(SESSION_ID)
       + '&studentId=' + encodeURIComponent(studentId)
       + '&name='      + encodeURIComponent(sName)
       + '&courseId='  + encodeURIComponent(courseId)
       + '&color='     + encodeURIComponent(autoColor);
 
-    var img = new Image();
-    img.onload = img.onerror = function(){
-      console.log('✅ 寫入請求已送達 GAS：', sName);
-      setTimeout(function(){
-        jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
-          if(!e2 && d2 && d2.ok){
-            document.getElementById('cntN').textContent     = d2.presentCount || checkinCount;
-            document.getElementById('cntTotal').textContent = '/' + (d2.totalCount || 0);
-          }
-        });
-      }, 5000);
-    };
-    img.src = writeUrl;
+    fetch(writeUrl, { mode: 'no-cors' })
+      .then(function(){ console.log('✅ 寫入已送出：', sName); })
+      .catch(function(e2){ console.warn('⚠️ fetch 失敗：', e2.message); });
+
+    // 5 秒後同步人數
+    setTimeout(function(){
+      jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
+        if(!e2 && d2 && d2.ok){
+          document.getElementById('cntN').textContent     = d2.presentCount || checkinCount;
+          document.getElementById('cntTotal').textContent = '/' + (d2.totalCount || 0);
+        }
+      });
+    }, 5000);
   });
 }
 function addTag(name){
