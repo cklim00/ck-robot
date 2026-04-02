@@ -58,7 +58,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 <body>
 <div class="wrap">
   <div class="topbar">
-    <span id="topTitle">GN432 // ROLL-CALL SYS v3.1</span>
+    <span id="topTitle">GN432 // ROLL-CALL SYS v3.2</span>
     <span id="clock">--:--:--</span>
   </div>
 
@@ -144,126 +144,114 @@ var checkinCount = 0;
 var isListening  = false;
 var isSpeaking   = false;
 var recognition  = null;
-var checkedSet   = {};  // 本地防重複記憶 { "場次ID_學號": true }
-var localLog     = [];  // 本地出席備份陣列
+var checkedSet   = {};   // 本地防重複記憶 { "場次ID_學號": true }
+var localLog     = [];   // 本地出席備份陣列
 
 // ════════════════════════════════════
 // 時鐘
 // ════════════════════════════════════
 setInterval(function(){
-  var n=new Date();
-  document.getElementById('clock').textContent=
+  var n = new Date();
+  document.getElementById('clock').textContent =
     ('0'+n.getHours()).slice(-2)+':'+('0'+n.getMinutes()).slice(-2)+':'+('0'+n.getSeconds()).slice(-2);
-},1000);
+}, 1000);
 
 // LED 閃爍
-var ls=true;
+var ls = true;
 setInterval(function(){
-  ls=!ls;
-  document.getElementById('led1').style.opacity=ls?'.9':'.3';
-  document.getElementById('led2').style.opacity=ls?'.3':'.9';
-},900);
+  ls = !ls;
+  document.getElementById('led1').style.opacity = ls ? '.9' : '.3';
+  document.getElementById('led2').style.opacity = ls ? '.3' : '.9';
+}, 900);
 
 // ════════════════════════════════════
 // 打字效果
 // ════════════════════════════════════
-var _tt=null;
+var _tt = null;
 function typeText(txt){
-  var el=document.getElementById('btext');
-  if(_tt)clearInterval(_tt);
-  el.innerHTML='<span class="cursor"></span>';
-  var i=0;
-  _tt=setInterval(function(){
-    if(i<txt.length){
-      el.textContent=txt.substring(0,i+1);
+  var el = document.getElementById('btext');
+  if(_tt) clearInterval(_tt);
+  el.innerHTML = '<span class="cursor"></span>';
+  var i = 0;
+  _tt = setInterval(function(){
+    if(i < txt.length){
+      el.textContent = txt.substring(0, i+1);
       i++;
     } else {
       clearInterval(_tt);
     }
-  },38);
+  }, 38);
 }
 
 // ════════════════════════════════════
 // 表情
 // ════════════════════════════════════
 function setFace(mood){
-  var eg=document.getElementById('eyeGrp');
-  eg.className='eye-grp';
-  document.getElementById('blushL').style.opacity='.6';
-  document.getElementById('blushR').style.opacity='.6';
-  if(mood==='listen'){eg.classList.add('listen');}
-  else if(mood==='happy'){
+  var eg = document.getElementById('eyeGrp');
+  eg.className = 'eye-grp';
+  document.getElementById('blushL').style.opacity = '.6';
+  document.getElementById('blushR').style.opacity = '.6';
+  if(mood === 'listen'){ eg.classList.add('listen'); }
+  else if(mood === 'happy'){
     eg.classList.add('happy');
-    document.getElementById('blushL').style.opacity='1';
-    document.getElementById('blushR').style.opacity='1';
+    document.getElementById('blushL').style.opacity = '1';
+    document.getElementById('blushR').style.opacity = '1';
   }
 }
 
 // ════════════════════════════════════
 // 狀態列
 // ════════════════════════════════════
-function setStatus(state,txt){
-  document.getElementById('dot').className='dot '+(state==='on'?'on':state==='err'?'err':'');
-  document.getElementById('statusTxt').textContent=txt;
+function setStatus(state, txt){
+  document.getElementById('dot').className = 'dot ' + (state==='on' ? 'on' : state==='err' ? 'err' : '');
+  document.getElementById('statusTxt').textContent = txt;
 }
 
 // ════════════════════════════════════
 // TTS
 // ════════════════════════════════════
-var VOICES_LOADED=false;
-function loadVoices(){if(window.speechSynthesis){window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=function(){VOICES_LOADED=true;window.speechSynthesis.getVoices();};}}
-function speak(txt,cb){
-  if(!window.speechSynthesis)return cb&&cb();
+var VOICES_LOADED = false;
+function loadVoices(){
+  if(window.speechSynthesis){
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = function(){
+      VOICES_LOADED = true;
+      window.speechSynthesis.getVoices();
+    };
+  }
+}
+function speak(txt, cb){
+  if(!window.speechSynthesis) return cb && cb();
   window.speechSynthesis.cancel();
-  var u=new SpeechSynthesisUtterance(txt);
-  u.lang='zh-TW';u.rate=.95;u.pitch=1.1;
-  var vs=window.speechSynthesis.getVoices();
-  var v=vs.find(function(x){return x.lang.includes('zh-TW');})||vs.find(function(x){return x.lang.includes('zh');});
-  if(v)u.voice=v;
-  isSpeaking=true;
-  u.onend=u.onerror=function(){isSpeaking=false;if(cb)cb();};
+  var u = new SpeechSynthesisUtterance(txt);
+  u.lang = 'zh-TW'; u.rate = .95; u.pitch = 1.1;
+  var vs = window.speechSynthesis.getVoices();
+  var v = vs.find(function(x){ return x.lang.includes('zh-TW'); }) ||
+          vs.find(function(x){ return x.lang.includes('zh'); });
+  if(v) u.voice = v;
+  isSpeaking = true;
+  u.onend = u.onerror = function(){ isSpeaking = false; if(cb) cb(); };
   window.speechSynthesis.speak(u);
 }
 
 // ════════════════════════════════════
-// JSONP
+// JSONP（有 callback，用於需要回傳值的請求）
 // ════════════════════════════════════
 function jsonp(url, cb){
-  var name='_ck_'+Date.now()+'_'+Math.floor(Math.random()*9999);
-  var done=false;
-  var script=document.createElement('script');
-  var timer=setTimeout(function(){finish(new Error('timeout'),null);},28000);
-  function finish(e,d){
-    if(done)return;done=true;
+  var name = '_ck_' + Date.now() + '_' + Math.floor(Math.random()*9999);
+  var done = false;
+  var script = document.createElement('script');
+  var timer = setTimeout(function(){ finish(new Error('timeout'), null); }, 28000);
+  function finish(e, d){
+    if(done) return; done = true;
     clearTimeout(timer);
-    try{delete window[name];}catch(ex){}
-    try{if(script.parentNode)script.parentNode.removeChild(script);}catch(ex){}
-    cb(e,d);
+    try{ delete window[name]; }catch(ex){}
+    try{ if(script.parentNode) script.parentNode.removeChild(script); }catch(ex){}
+    cb(e, d);
   }
-  window[name]=function(d){finish(null,d);};
-  script.onerror=function(){finish(new Error('script error'),null);};
-  script.src=url+(url.indexOf('?')>=0?'&':'?')+'callback='+name;
-  document.head.appendChild(script);
-}
-
-// ════════════════════════════════════
-// JSONP Silent（背景寫入用，timeout 30 秒）
-// ════════════════════════════════════
-function jsonpSilent(url, cb){
-  var name='_cks_'+Date.now()+'_'+Math.floor(Math.random()*9999);
-  var done=false;
-  var script=document.createElement('script');
-  var timer=setTimeout(function(){finish(new Error('timeout'),null);},30000);
-  function finish(e,d){
-    if(done)return;done=true;
-    clearTimeout(timer);
-    try{delete window[name];}catch(ex){}
-    try{if(script.parentNode)script.parentNode.removeChild(script);}catch(ex){}
-    if(cb)cb(e,d);
-  }
-  window[name]=function(d){finish(null,d);};
-  script.onerror=function(){finish(new Error('script error'),null);};
-  script.src=url+(url.indexOf('?')>=0?'&':'?')+'callback='+name;
+  window[name] = function(d){ finish(null, d); };
+  script.onerror = function(){ finish(new Error('script error'), null); };
+  script.src = url + (url.indexOf('?') >= 0 ? '&' : '?') + 'callback=' + name;
   document.head.appendChild(script);
 }
 
@@ -271,25 +259,24 @@ function jsonpSilent(url, cb){
 // 啟動：先暖機再抓場次
 // ════════════════════════════════════
 function warmUp(cb){
-  // 發一個超輕量請求把 GAS runtime 喚醒
   var startT = Date.now();
   typeText('系統暖機中...\n首次啟動約需 10 秒');
-  jsonp(GAS_URL+'?action=getOpenSession', function(err, data){
-    var elapsed = ((Date.now()-startT)/1000).toFixed(1);
-    console.log('暖機完成，耗時 '+elapsed+' 秒');
+  jsonp(GAS_URL + '?action=getOpenSession', function(err, data){
+    var elapsed = ((Date.now() - startT) / 1000).toFixed(1);
+    console.log('暖機完成，耗時 ' + elapsed + ' 秒');
     cb(err, data);
   });
 }
 
 function init(){
-  setStatus('','連線中');
+  setStatus('', '連線中');
   warmUp(function(err, data){
     if(!err && data && data.ok && data.sessionId){
       GARDEN_URL = data.gardenUrl || '';
-      document.getElementById('topTitle').textContent = 'GN432 // ' + (data.courseName||'');
+      document.getElementById('topTitle').textContent = 'GN432 // ' + (data.courseName || '');
       showSessionConfirm(data.sessionId, data.courseName, data.presentCount||0, data.totalCount||0);
     } else {
-      setStatus('err','無場次');
+      setStatus('err', '無場次');
       typeText('找不到開放中的場次\n請手動輸入場次ID');
       showManualInput();
     }
@@ -310,7 +297,7 @@ function showSessionConfirm(sid, courseName, present, total){
     '<div style="font-size:13px;color:#1a7a08;margin-bottom:5px;">'+(courseName||'')+'　已到：'+present+'/'+total+'人</div>'+
     '<button onclick="confirmSession()" style="width:100%;background:#0d3d04;border:2px solid #39ff14;color:#39ff14;padding:5px;font-family:VT323,monospace;font-size:18px;cursor:pointer;">✅ 確認開始！</button>';
   bubble.appendChild(div);
-  setTimeout(function(){ var i=document.getElementById('sidInput'); if(i){i.focus();i.select();} },100);
+  setTimeout(function(){ var i = document.getElementById('sidInput'); if(i){ i.focus(); i.select(); } }, 100);
 }
 
 function confirmSession(){
@@ -318,47 +305,46 @@ function confirmSession(){
   if(!inp || !inp.value.trim()) return;
   SESSION_ID = inp.value.trim();
   var a = document.getElementById('scArea'); if(a) a.remove();
-  setStatus('on','就緒'); setFace('');
+  setStatus('on', '就緒'); setFace('');
   typeText('場次：'+SESSION_ID+'\n大家好！我是點名小CK！\n請按按鈕說出學號！');
   speak('大家好！我是點名小CK！請說出你的學號完成點名！');
   if(GARDEN_URL) addGardenBtn();
-
   // 顯示目前人數
-  document.getElementById('cntTotal').textContent = '/'+( document.querySelector('#scArea') ? 0 : 0);
-  jsonp(GAS_URL+'?action=getOpenSession', function(e2,d2){
-    if(!e2&&d2&&d2.ok){
-      document.getElementById('cntN').textContent    = d2.presentCount||0;
-      document.getElementById('cntTotal').textContent = '/'+(d2.totalCount||0);
+  jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
+    if(!e2 && d2 && d2.ok){
+      document.getElementById('cntN').textContent     = d2.presentCount || 0;
+      document.getElementById('cntTotal').textContent = '/' + (d2.totalCount || 0);
     }
   });
 }
 
 function addGardenBtn(){
-  var existing=document.getElementById('gardenBtn');
-  if(existing)return;
-  var btn=document.createElement('button');
-  btn.id='gardenBtn';
-  btn.textContent='🌸 花園投影牆';
-  btn.style.cssText='background:rgba(57,255,20,.1);border:2px solid #39ff14;color:#39ff14;font-family:VT323,monospace;font-size:16px;padding:4px 12px;cursor:pointer;margin-top:4px;';
-  btn.onclick=function(){window.open(GARDEN_URL,'_blank');};
+  var existing = document.getElementById('gardenBtn');
+  if(existing) return;
+  var btn = document.createElement('button');
+  btn.id = 'gardenBtn';
+  btn.textContent = '🌸 花園投影牆';
+  btn.style.cssText = 'background:rgba(57,255,20,.1);border:2px solid #39ff14;color:#39ff14;font-family:VT323,monospace;font-size:16px;padding:4px 12px;cursor:pointer;margin-top:4px;';
+  btn.onclick = function(){ window.open(GARDEN_URL, '_blank'); };
   document.querySelector('.robot-area').appendChild(btn);
 }
 
 function showManualInput(){
-  var div=document.createElement('div');
-  div.style.cssText='display:flex;gap:6px;margin-top:8px;';
-  div.innerHTML='<input id="manSid" placeholder="場次ID，例：CK04021430" style="flex:1;background:#071208;border:2px solid #1a7a08;color:#39ff14;padding:5px 8px;font-family:VT323,monospace;font-size:18px;">'
-    +'<button onclick="confirmManual()" style="background:#0d3d04;border:2px solid #39ff14;color:#39ff14;padding:5px 12px;font-family:VT323,monospace;font-size:16px;cursor:pointer;">確認</button>';
+  var div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:6px;margin-top:8px;';
+  div.innerHTML =
+    '<input id="manSid" placeholder="場次ID，例：CK04021430" style="flex:1;background:#071208;border:2px solid #1a7a08;color:#39ff14;padding:5px 8px;font-family:VT323,monospace;font-size:18px;">' +
+    '<button onclick="confirmManual()" style="background:#0d3d04;border:2px solid #39ff14;color:#39ff14;padding:5px 12px;font-family:VT323,monospace;font-size:16px;cursor:pointer;">確認</button>';
   document.querySelector('.bubble').appendChild(div);
-  setTimeout(function(){var el=document.getElementById('manSid');if(el)el.focus();},100);
+  setTimeout(function(){ var el = document.getElementById('manSid'); if(el) el.focus(); }, 100);
 }
 
 function confirmManual(){
-  var inp=document.getElementById('manSid');
-  if(!inp||!inp.value.trim())return;
-  SESSION_ID=inp.value.trim();
-  var p=inp.parentNode;if(p)p.remove();
-  setStatus('on','手動模式');
+  var inp = document.getElementById('manSid');
+  if(!inp || !inp.value.trim()) return;
+  SESSION_ID = inp.value.trim();
+  var p = inp.parentNode; if(p) p.remove();
+  setStatus('on', '手動模式');
   typeText('好！場次：'+SESSION_ID+'\n按下按鈕說出學號！');
   speak('好的！請按按鈕說出你的學號！');
 }
@@ -367,144 +353,149 @@ function confirmManual(){
 // 語音辨識
 // ════════════════════════════════════
 function startListen(){
-  if(isListening)return;
-  if(isSpeaking){window.speechSynthesis.cancel();isSpeaking=false;}
-  if(!SESSION_ID){typeText('請先等待場次載入\n或手動輸入場次ID');return;}
-  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-  if(!SR){typeText('此瀏覽器不支援語音\n請使用 Chrome！');return;}
-  recognition=new SR();
-  recognition.lang='zh-TW';
-  recognition.interimResults=false;
-  recognition.maxAlternatives=3;
-  recognition.continuous=false;
-  var btn=document.getElementById('micBtn');
+  if(isListening) return;
+  if(isSpeaking){ window.speechSynthesis.cancel(); isSpeaking = false; }
+  if(!SESSION_ID){ typeText('請先等待場次載入\n或手動輸入場次ID'); return; }
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){ typeText('此瀏覽器不支援語音\n請使用 Chrome！'); return; }
+  recognition = new SR();
+  recognition.lang = 'zh-TW';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 3;
+  recognition.continuous = false;
+  var btn = document.getElementById('micBtn');
   btn.classList.add('rec');
-  btn.textContent='[ 🔴 聽取中... ]';
-  isListening=true;
+  btn.textContent = '[ 🔴 聽取中... ]';
+  isListening = true;
   setFace('listen');
-  setStatus('on','聆聽中');
+  setStatus('on', '聆聽中');
   typeText('請說出你的學號...');
 
-  recognition.onresult=function(e){
-    var heard='';
-    for(var i=0;i<e.results[0].length;i++){
-      var t=e.results[0][i].transcript.trim();
-      var n=t.replace(/[^0-9]/g,'');
-      if(n.length>=6){heard=n;break;}
-      heard=t;
+  recognition.onresult = function(e){
+    var heard = '';
+    for(var i = 0; i < e.results[0].length; i++){
+      var t = e.results[0][i].transcript.trim();
+      var n = t.replace(/[^0-9]/g, '');
+      if(n.length >= 6){ heard = n; break; }
+      heard = t;
     }
     processCheckin(heard);
   };
-  recognition.onerror=function(e){
+  recognition.onerror = function(e){
     resetBtn();
-    if(e.error==='not-allowed'){
-      setStatus('err','麥克風被拒');
+    if(e.error === 'not-allowed'){
+      setStatus('err', '麥克風被拒');
       typeText('請允許麥克風！\n點網址列旁的鎖頭圖示');
-    } else if(e.error==='no-speech'){
-      setStatus('on','就緒');setFace('');typeText('沒聽到聲音，再試一次？');
+    } else if(e.error === 'no-speech'){
+      setStatus('on', '就緒'); setFace(''); typeText('沒聽到聲音，再試一次？');
     } else {
-      setStatus('err',e.error);typeText('辨識失敗 ('+e.error+')\n再按一次！');
+      setStatus('err', e.error); typeText('辨識失敗 ('+e.error+')\n再按一次！');
     }
   };
-  recognition.onend=function(){resetBtn();};
+  recognition.onend = function(){ resetBtn(); };
   recognition.start();
 }
 
 function resetBtn(){
-  isListening=false;
-  var btn=document.getElementById('micBtn');
+  isListening = false;
+  var btn = document.getElementById('micBtn');
   btn.classList.remove('rec');
-  btn.textContent='[ 🎤 開始說話 ]';
+  btn.textContent = '[ 🎤 開始說話 ]';
 }
 
 // ════════════════════════════════════
 // 簽到流程
 // ════════════════════════════════════
-var CONFIRMS=['好的！查名單中...','收到！確認中...','嗯嗯！等我找一下...','好！查詢中...'];
-var SUCCESS=['{n}，簽到成功！花朵種好了！','歡迎 {n}！出席紀錄完成！','{n}！叮！登記了！','收到！{n} 已到，辛苦了！'];
-var NOTFOUND=['找不到這個學號，再說一次？','嗯...名單裡沒有，再試試？','奇怪，沒找到，確認學號後再說'];
+var CONFIRMS = ['好的！查名單中...', '收到！確認中...', '嗯嗯！等我找一下...', '好！查詢中...'];
+var SUCCESS  = ['{n}，簽到成功！花朵種好了！', '歡迎 {n}！出席紀錄完成！', '{n}！叮！登記了！', '收到！{n} 已到，辛苦了！'];
+var NOTFOUND = ['找不到這個學號，再說一次？', '嗯...名單裡沒有，再試試？', '奇怪，沒找到，確認學號後再說'];
 
-function rand(a){return a[Math.floor(Math.random()*a.length)];}
+function rand(a){ return a[Math.floor(Math.random() * a.length)]; }
 
 function processCheckin(studentId){
-  setStatus('on','處理中');
-  typeText(rand(CONFIRMS)+'\n學號：'+studentId);
+  setStatus('on', '處理中');
+  typeText(rand(CONFIRMS) + '\n學號：' + studentId);
   doLookup(studentId);
 }
 
 // ════════════════════════════════════
-// ✅ 核心修正：lookupStudent + write=1
-//    一個 JSONP 同時查名＋寫入出席紀錄
+// ✅ 核心修正：一次請求完成查名 + 寫入
+//    使用 action=checkin，GAS 內部同時處理
 // ════════════════════════════════════
 function doLookup(studentId){
-  var colors=['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
-  var ci=0;
-  for(var cc=0;cc<studentId.length;cc++) ci+=studentId.charCodeAt(cc);
-  var autoColor=colors[ci%colors.length];
+  var colors = ['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
+  var ci = 0;
+  for(var cc = 0; cc < studentId.length; cc++) ci += studentId.charCodeAt(cc);
+  var autoColor = colors[ci % colors.length];
 
-  // 本地防重複
-  var key=SESSION_ID+'_'+studentId;
+  // 本地防重複（快速擋，不等 GAS）
+  var key = SESSION_ID + '_' + studentId;
   if(checkedSet[key]){
     typeText('此學號本場次已登記！');
-    speak('已經簽到過了！',function(){setFace('');setStatus('on','就緒');});
+    speak('已經簽到過了！', function(){ setFace(''); setStatus('on', '就緒'); });
     return;
   }
 
-  // 步驟1：快速查名（只讀，~1秒）
-  var lookupUrl=GAS_URL+'?action=lookupStudent&studentId='+encodeURIComponent(studentId);
+  // ✅ 一次請求：查名 + 防重複 + 寫入，全部在 GAS 內部完成
+  var url = GAS_URL
+    + '?action=checkin'
+    + '&sid='       + encodeURIComponent(SESSION_ID)
+    + '&studentId=' + encodeURIComponent(studentId)
+    + '&color='     + encodeURIComponent(autoColor);
 
-  jsonp(lookupUrl,function(err,data){
-    if(err||!data||!data.ok||!data.name){
-      setFace('');setStatus('err','找不到');
+  jsonp(url, function(err, data){
+    if(err || !data || !data.ok || !data.name){
+      setFace(''); setStatus('err', '找不到');
       typeText(rand(NOTFOUND));
-      speak('找不到這個學號，請再說一次。',function(){setStatus('on','就緒');});
+      speak('找不到這個學號，請再說一次。', function(){ setStatus('on', '就緒'); });
       return;
     }
 
-    var sName=data.name;
-    checkedSet[key]=true;
-    localLog.push({time:new Date().toLocaleString('zh-TW'),sid:SESSION_ID,studentId:studentId,name:sName,color:autoColor});
+    var sName = data.name;
 
-    // 立刻顯示成功
+    if(data.alreadySigned){
+      typeText(sName + '，你已簽到過囉！');
+      speak(sName + '，你已經簽到過了！', function(){ setFace(''); setStatus('on', '就緒'); });
+      checkedSet[key] = true; // 同步本地記憶
+      return;
+    }
+
+    // 寫入成功
+    checkedSet[key] = true;
+    localLog.push({
+      time: new Date().toLocaleString('zh-TW'),
+      sid: SESSION_ID,
+      studentId: studentId,
+      name: sName,
+      color: autoColor
+    });
+
     setFace('happy');
-    typeText(rand(SUCCESS).replace('{n}',sName));
-    speak(sName+'，簽到成功！花朵種好了！',function(){setFace('');setStatus('on','就緒');});
+    typeText(rand(SUCCESS).replace('{n}', sName));
+    speak(sName + '，簽到成功！花朵種好了！', function(){ setFace(''); setStatus('on', '就緒'); });
     addTag(sName);
     checkinCount++;
-    document.getElementById('cntN').textContent=checkinCount;
+    document.getElementById('cntN').textContent = checkinCount;
 
-    // 步驟2：用 <img> tag 寫入（帶 Cookie、跟隨重導向、fire-and-forget）
-    var writeUrl=GAS_URL
-      +'?action=quickCheckin'
-      +'&sid='      +encodeURIComponent(SESSION_ID)
-      +'&studentId='+encodeURIComponent(studentId)
-      +'&name='     +encodeURIComponent(sName)
-      +'&color='    +encodeURIComponent(autoColor);
-
-    var img=new Image();
-    img.onload=img.onerror=function(){
-      console.log('✅ 寫入請求已送達 GAS：',sName);
-      // 更新人數
-      setTimeout(function(){
-        jsonp(GAS_URL+'?action=getOpenSession',function(e2,d2){
-          if(!e2&&d2&&d2.ok){
-            document.getElementById('cntN').textContent    =d2.presentCount||checkinCount;
-            document.getElementById('cntTotal').textContent='/'+(d2.totalCount||0);
-          }
-        });
-      },5000);
-    };
-    img.src=writeUrl;
+    // 5 秒後向 GAS 同步最新人數
+    setTimeout(function(){
+      jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
+        if(!e2 && d2 && d2.ok){
+          document.getElementById('cntN').textContent     = d2.presentCount || checkinCount;
+          document.getElementById('cntTotal').textContent = '/' + (d2.totalCount || 0);
+        }
+      });
+    }, 5000);
   });
 }
 
 function addTag(name){
-  var list=document.getElementById('tags');
-  var t=document.createElement('div');
-  t.className='tag new';t.textContent=name;
-  list.insertBefore(t,list.firstChild);
-  setTimeout(function(){t.classList.remove('new');},2000);
-  while(list.children.length>6)list.removeChild(list.lastChild);
+  var list = document.getElementById('tags');
+  var t = document.createElement('div');
+  t.className = 'tag new'; t.textContent = name;
+  list.insertBefore(t, list.firstChild);
+  setTimeout(function(){ t.classList.remove('new'); }, 2000);
+  while(list.children.length > 6) list.removeChild(list.lastChild);
 }
 
 // ════════════════════════════════════
@@ -519,14 +510,14 @@ function exportCSV(){
   var rows   = localLog.map(function(r){
     return [r.time, r.sid, r.studentId, r.name].join(',');
   }).join('\n');
-  var blob = new Blob(['\uFEFF'+header+rows], {type:'text/csv;charset=utf-8'});
+  var blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8' });
   var url  = URL.createObjectURL(blob);
   var a    = document.createElement('a');
   a.href   = url;
-  a.download = 'attendance_'+SESSION_ID+'_'+Date.now()+'.csv';
+  a.download = 'attendance_' + SESSION_ID + '_' + Date.now() + '.csv';
   a.click();
   URL.revokeObjectURL(url);
-  typeText('✅ 已下載本地備份\n共 '+localLog.length+' 筆');
+  typeText('✅ 已下載本地備份\n共 ' + localLog.length + ' 筆');
 }
 
 // ════════════════════════════════════
@@ -534,17 +525,17 @@ function exportCSV(){
 // ════════════════════════════════════
 function runDiag(){
   typeText('診斷中...');
-  if(!GAS_URL){typeText('GAS_URL 未設定！');return;}
-  jsonp(GAS_URL+'?action=getOpenSession',function(err,data){
+  if(!GAS_URL){ typeText('GAS_URL 未設定！'); return; }
+  jsonp(GAS_URL + '?action=getOpenSession', function(err, data){
     if(err){
-      typeText('GAS 連線失敗\n錯誤：'+err.message);
-      setStatus('err','連線失敗');
+      typeText('GAS 連線失敗\n錯誤：' + err.message);
+      setStatus('err', '連線失敗');
     } else if(data && data.ok){
       typeText('✅ 連線正常！\n場次：'+(data.sessionId||'無')+'\n已到：'+(data.presentCount||0)+'/'+(data.totalCount||0));
-      setStatus('on','連線正常');
+      setStatus('on', '連線正常');
     } else {
-      typeText('GAS 回應：\n'+(data?JSON.stringify(data).substring(0,80):'null'));
-      setStatus('err','無場次');
+      typeText('GAS 回應：\n' + (data ? JSON.stringify(data).substring(0, 80) : 'null'));
+      setStatus('err', '無場次');
     }
   });
 }
@@ -558,13 +549,13 @@ function toggleManual(){
   var open = area.style.display === 'none';
   area.style.display = open ? 'flex' : 'none';
   area.style.flexDirection = 'column';
-  btn.textContent = open ? '✕ 關閉手動輸入' : '⌨ 手動輸入學號';
-  btn.style.color = open ? '#39ff14' : '#1a7a08';
+  btn.textContent  = open ? '✕ 關閉手動輸入' : '⌨ 手動輸入學號';
+  btn.style.color  = open ? '#39ff14' : '#1a7a08';
   btn.style.borderColor = open ? '#39ff14' : '#1a4a08';
   if(open){
     setTimeout(function(){
       var inp = document.getElementById('manualIdInput');
-      if(inp){ inp.focus(); inp.value=''; }
+      if(inp){ inp.focus(); inp.value = ''; }
     }, 50);
   }
 }
@@ -573,7 +564,7 @@ function submitManual(){
   if(!SESSION_ID){ typeText('請先等待場次載入\n或手動輸入場次ID'); return; }
   var inp = document.getElementById('manualIdInput');
   if(!inp) return;
-  var val = inp.value.replace(/[^0-9]/g,'').trim();
+  var val = inp.value.replace(/[^0-9]/g, '').trim();
   if(val.length < 5){ typeText('學號太短，請再確認'); inp.focus(); return; }
   inp.value = '';
   inp.focus();
@@ -583,16 +574,19 @@ function submitManual(){
 // ════════════════════════════════════
 // 空白鍵觸發
 // ════════════════════════════════════
-document.addEventListener('keydown',function(e){
-  var active = document.activeElement;
-  var isTyping = active && (active.tagName==='INPUT'||active.tagName==='TEXTAREA');
-  if(e.code==='Space'&&!isListening&&!isSpeaking&&!isTyping){e.preventDefault();startListen();}
+document.addEventListener('keydown', function(e){
+  var active  = document.activeElement;
+  var isTyping = active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA');
+  if(e.code === 'Space' && !isListening && !isSpeaking && !isTyping){
+    e.preventDefault();
+    startListen();
+  }
 });
 
 // ════════════════════════════════════
 // 啟動
 // ════════════════════════════════════
-window.addEventListener('load',function(){
+window.addEventListener('load', function(){
   loadVoices();
   setTimeout(init, 600);
 });
