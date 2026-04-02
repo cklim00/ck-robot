@@ -493,7 +493,7 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // ── Step 2：fetch no-cors 寫入（繞過 ORB，fire-and-forget）
+    // ── Step 2：<img> tag 寫入（GAS 確認可收到，fire-and-forget）
     var writeUrl = GAS_URL
       + '?action=ckReg'
       + '&sid='       + encodeURIComponent(SESSION_ID)
@@ -502,9 +502,11 @@ function doLookup(studentId){
       + '&courseId='  + encodeURIComponent(courseId)
       + '&color='     + encodeURIComponent(autoColor);
 
-    fetch(writeUrl, { mode: 'no-cors' })
-      .then(function(){ console.log('✅ 寫入已送出：', sName); })
-      .catch(function(e2){ console.warn('⚠️ 寫入送出失敗：', e2); });
+    var img = new Image();
+    img.onload = img.onerror = function(){
+      console.log('✅ 寫入請求已送達 GAS：', sName);
+    };
+    img.src = writeUrl;
 
     // 5 秒後同步最新人數
     setTimeout(function(){
