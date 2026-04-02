@@ -490,9 +490,10 @@ function doLookup(studentId){
     document.getElementById('cntN').textContent = checkinCount;
 
     // ── Step 2：隱藏表單寫入（Form Submit，跨域完全不受限）
+    var PROXY_URL = 'https://ck-proxy.vercel.app/api/proxy';
     var form = document.createElement('form');
     form.method = 'GET';
-    form.action = GAS_URL;
+    form.action = PROXY_URL;
     form.target = 'ck_write_frame';  // 送到隱藏 iframe，不影響畫面
 
     var fields = {
