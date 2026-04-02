@@ -454,7 +454,7 @@ function doLookup(studentId){
 
   // ✅ 一次請求：查名 + 防重複 + 寫入，全部在 GAS 內部完成
   var url = GAS_URL
-    + '?action=checkin'
+    + '?action=ckAttend'
     + '&sid='       + encodeURIComponent(SESSION_ID)
     + '&studentId=' + encodeURIComponent(studentId)
     + '&color='     + encodeURIComponent(autoColor);
