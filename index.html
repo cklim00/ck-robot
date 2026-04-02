@@ -435,8 +435,9 @@ function processCheckin(studentId){
 }
 
 // ════════════════════════════════════
-// ✅ 核心修正：一次請求完成查名 + 寫入
-//    使用 action=checkin，GAS 內部同時處理
+// ✅ 最終修正：讀寫分離
+//    查名：JSONP（Chrome ORB 允許）
+//    寫入：fetch no-cors（完全繞過 ORB）
 // ════════════════════════════════════
 function doLookup(studentId){
   var colors = ['#4A90D9','#F5C518','#4CAF50','#E53935','#8E44AD','#F06292','#FF8C00','#00BCD4','#9C27B0','#FF7043'];
@@ -444,7 +445,7 @@ function doLookup(studentId){
   for(var cc = 0; cc < studentId.length; cc++) ci += studentId.charCodeAt(cc);
   var autoColor = colors[ci % colors.length];
 
-  // 本地防重複（快速擋，不等 GAS）
+  // 本地防重複
   var key = SESSION_ID + '_' + studentId;
   if(checkedSet[key]){
     typeText('此學號本場次已登記！');
@@ -452,18 +453,14 @@ function doLookup(studentId){
     return;
   }
 
-  // ✅ 一次請求：查名 + 防重複 + 寫入，全部在 GAS 內部完成
-  var url = GAS_URL
-    + '?action=ckReg'
-    + '&sid='       + encodeURIComponent(SESSION_ID)
-    + '&studentId=' + encodeURIComponent(studentId)
-    + '&color='     + encodeURIComponent(autoColor);
+  // ── Step 1：JSONP 查名（唯讀，不觸發 ORB）
+  var lookupUrl = GAS_URL
+    + '?action=lookupStudent'
+    + '&studentId=' + encodeURIComponent(studentId);
 
-  console.log('SESSION_ID：', SESSION_ID, '　studentId：', studentId);
-  console.log('送出URL：', url);
+  jsonp(lookupUrl, function(err, data){
+    console.log('查名回傳：', JSON.stringify(data), err ? err.message : '');
 
-  jsonp(url, function(err, data){
-    console.log('GAS回傳：', JSON.stringify(data), ' / err：', err ? err.message : 'null');
     if(err || !data || !data.ok || !data.name){
       setFace(''); setStatus('err', '找不到');
       typeText(rand(NOTFOUND));
@@ -471,16 +468,10 @@ function doLookup(studentId){
       return;
     }
 
-    var sName = data.name;
+    var sName    = data.name;
+    var courseId = data.courseId || 'GN432';
 
-    if(data.alreadySigned){
-      typeText(sName + '，你已簽到過囉！');
-      speak(sName + '，你已經簽到過了！', function(){ setFace(''); setStatus('on', '就緒'); });
-      checkedSet[key] = true; // 同步本地記憶
-      return;
-    }
-
-    // 寫入成功
+    // 立刻顯示成功（不等寫入）
     checkedSet[key] = true;
     localLog.push({
       time: new Date().toLocaleString('zh-TW'),
@@ -497,18 +488,30 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // 5 秒後向 GAS 同步最新人數
+    // ── Step 2：fetch no-cors 寫入（繞過 ORB，fire-and-forget）
+    var writeUrl = GAS_URL
+      + '?action=ckReg'
+      + '&sid='       + encodeURIComponent(SESSION_ID)
+      + '&studentId=' + encodeURIComponent(studentId)
+      + '&name='      + encodeURIComponent(sName)
+      + '&courseId='  + encodeURIComponent(courseId)
+      + '&color='     + encodeURIComponent(autoColor);
+
+    fetch(writeUrl, { mode: 'no-cors' })
+      .then(function(){ console.log('✅ 寫入已送出：', sName); })
+      .catch(function(e2){ console.warn('⚠️ 寫入送出失敗：', e2); });
+
+    // 5 秒後同步最新人數
     setTimeout(function(){
-      jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
-        if(!e2 && d2 && d2.ok){
-          document.getElementById('cntN').textContent     = d2.presentCount || checkinCount;
-          document.getElementById('cntTotal').textContent = '/' + (d2.totalCount || 0);
+      jsonp(GAS_URL + '?action=getOpenSession', function(e3, d3){
+        if(!e3 && d3 && d3.ok){
+          document.getElementById('cntN').textContent     = d3.presentCount || checkinCount;
+          document.getElementById('cntTotal').textContent = '/' + (d3.totalCount || 0);
         }
       });
     }, 5000);
   });
 }
-
 function addTag(name){
   var list = document.getElementById('tags');
   var t = document.createElement('div');
