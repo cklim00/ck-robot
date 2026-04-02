@@ -489,32 +489,22 @@ function doLookup(studentId){
     checkinCount++;
     document.getElementById('cntN').textContent = checkinCount;
 
-    // ── Step 2：隱藏表單寫入（Form Submit，跨域完全不受限）
-    var PROXY_URL = 'https://ck-proxy.vercel.app/api/proxy';
-    var form = document.createElement('form');
-    form.method = 'GET';
-    form.action = PROXY_URL;
-    form.target = 'ck_write_frame';  // 送到隱藏 iframe，不影響畫面
+    // ── Step 2：JSONP 寫入（經過 Vercel Proxy，無跨域問題）
+    var writeUrl = GAS_URL
+      + '?action=quickCheckin'
+      + '&sid='       + encodeURIComponent(SESSION_ID)
+      + '&studentId=' + encodeURIComponent(studentId)
+      + '&name='      + encodeURIComponent(sName)
+      + '&courseId='  + encodeURIComponent(courseId)
+      + '&color='     + encodeURIComponent(autoColor);
 
-    var fields = {
-      action:    'quickCheckin',
-      sid:       SESSION_ID,
-      studentId: studentId,
-      name:      sName,
-      courseId:  courseId,
-      color:     autoColor
-    };
-    Object.keys(fields).forEach(function(k){
-      var inp = document.createElement('input');
-      inp.type = 'hidden';
-      inp.name = k;
-      inp.value = fields[k];
-      form.appendChild(inp);
+    jsonp(writeUrl, function(wErr, wData){
+      if(!wErr && wData && wData.ok){
+        console.log('✅ 寫入成功：', sName);
+      } else {
+        console.warn('⚠️ 寫入回傳：', JSON.stringify(wData), wErr ? wErr.message : '');
+      }
     });
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-    console.log('✅ 表單已送出：', sName);
     // 5 秒後同步人數
     setTimeout(function(){
       jsonp(GAS_URL + '?action=getOpenSession', function(e2, d2){
