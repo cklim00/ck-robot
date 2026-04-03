@@ -42,6 +42,16 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .dot.err{background:#f33}
 @keyframes pdot{from{opacity:.4}to{opacity:1}}
 .diag-btn{background:transparent;border:1px solid #1a4a08;color:#1a7a08;font-family:'VT323',monospace;font-size:13px;padding:1px 6px;cursor:pointer}
+
+/* ── 機器人表情動畫 ── */
+@keyframes eyeScan{0%,100%{transform:translateX(0)}30%{transform:translateX(-5px)}70%{transform:translateX(5px)}}
+@keyframes eyeThink{0%,100%{transform:translate(-2px,-1px)}50%{transform:translate(3px,1px)}}
+@keyframes earFlash{0%,100%{fill:#39ff14}50%{fill:#071208}}
+@keyframes earAlt{0%,100%{fill:#071208}50%{fill:#39ff14}}
+@keyframes ledPulse{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes happyBounce{0%,100%{transform:translateY(0) rotate(0deg)}30%{transform:translateY(-5px) rotate(-2deg)}70%{transform:translateY(-5px) rotate(2deg)}}
+@keyframes robotShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-6px)}60%{transform:translateX(6px)}80%{transform:translateX(-3px)}}
+@keyframes headNod{0%,100%{transform:rotate(0deg)}50%{transform:rotate(-3deg)}}
 /* 眼睛表情 */
 .eye-grp{transform-origin:center;animation:eblink 3.5s ease-in-out infinite}
 .eye-grp.listen{animation:elisten .5s ease-in-out infinite alternate}
@@ -200,18 +210,132 @@ function typeText(txt){
 }
 
 // ════════════════════════════════════
-// 表情
+// 表情系統（完整版）
 // ════════════════════════════════════
+function _eyePupils(lx,ly,lw,lh,rx,ry,rw,rh){
+  var lp=document.getElementById('eyeLP'),rp=document.getElementById('eyeRP');
+  lp.setAttribute('x',lx);lp.setAttribute('y',ly);lp.setAttribute('width',lw);lp.setAttribute('height',lh);
+  rp.setAttribute('x',rx);rp.setAttribute('y',ry);rp.setAttribute('width',rw);rp.setAttribute('height',rh);
+  // 瞳孔內的黑點跟著移動
+  var dots=document.querySelectorAll('#eyeGrp rect[fill="#071208"]');
+  if(dots[0]){dots[0].setAttribute('x',lx+4);dots[0].setAttribute('y',ly+2);}
+  if(dots[1]){dots[1].setAttribute('x',rx+4);dots[1].setAttribute('y',ry+2);}
+}
+function _setMouth(type){
+  var r=document.getElementById('mouth').querySelectorAll('rect');
+  // 全部恢復顯示
+  for(var i=0;i<r.length;i++)r[i].style.display='';
+  if(type==='smile'){
+    // 原始笑臉
+    r[0].setAttribute('x','36');r[0].setAttribute('y','62');r[0].setAttribute('fill','#1a7a08');
+    r[1].setAttribute('x','40');r[1].setAttribute('y','64');r[1].setAttribute('fill','#1a7a08');
+    r[2].setAttribute('x','44');r[2].setAttribute('y','65');r[2].setAttribute('width','22');r[2].setAttribute('height','4');r[2].setAttribute('fill','#39ff14');
+    r[3].setAttribute('x','66');r[3].setAttribute('y','64');r[3].setAttribute('fill','#1a7a08');
+    r[4].setAttribute('x','70');r[4].setAttribute('y','62');r[4].setAttribute('fill','#1a7a08');
+  } else if(type==='big'){
+    // 大笑
+    r[0].setAttribute('x','33');r[0].setAttribute('y','59');r[0].setAttribute('fill','#39ff14');
+    r[1].setAttribute('x','37');r[1].setAttribute('y','62');r[1].setAttribute('fill','#39ff14');
+    r[2].setAttribute('x','41');r[2].setAttribute('y','64');r[2].setAttribute('width','28');r[2].setAttribute('height','4');r[2].setAttribute('fill','#39ff14');
+    r[3].setAttribute('x','69');r[3].setAttribute('y','62');r[3].setAttribute('fill','#39ff14');
+    r[4].setAttribute('x','74');r[4].setAttribute('y','59');r[4].setAttribute('fill','#39ff14');
+  } else if(type==='frown'){
+    // 苦臉
+    r[0].setAttribute('x','36');r[0].setAttribute('y','68');r[0].setAttribute('fill','#1a7a08');
+    r[1].setAttribute('x','40');r[1].setAttribute('y','66');r[1].setAttribute('fill','#1a7a08');
+    r[2].setAttribute('x','44');r[2].setAttribute('y','63');r[2].setAttribute('width','22');r[2].setAttribute('height','4');r[2].setAttribute('fill','#39ff14');
+    r[3].setAttribute('x','66');r[3].setAttribute('y','66');r[3].setAttribute('fill','#1a7a08');
+    r[4].setAttribute('x','70');r[4].setAttribute('y','68');r[4].setAttribute('fill','#1a7a08');
+  } else if(type==='open'){
+    // 張口（聆聽/驚訝）
+    r[0].style.display='none';r[1].style.display='none';r[3].style.display='none';r[4].style.display='none';
+    r[2].setAttribute('x','38');r[2].setAttribute('y','61');r[2].setAttribute('width','34');r[2].setAttribute('height','7');r[2].setAttribute('fill','#39ff14');
+  } else if(type==='flat'){
+    // 一字型（思考/暖機）
+    r[0].style.display='none';r[1].style.display='none';r[3].style.display='none';r[4].style.display='none';
+    r[2].setAttribute('x','35');r[2].setAttribute('y','65');r[2].setAttribute('width','40');r[2].setAttribute('height','3');r[2].setAttribute('fill','#1a7a08');
+  }
+}
+function _resetRobot(){
+  var svg=document.querySelector('.robot-svg');
+  svg.style.animation='';
+  var eg=document.getElementById('eyeGrp');
+  eg.className='eye-grp';eg.style.animation='';
+  _eyePupils(33,32,12,10,65,32,12,10);
+  document.getElementById('blushL').style.opacity='.6';
+  document.getElementById('blushR').style.opacity='.6';
+  document.getElementById('blushL').setAttribute('fill','#1a7a08');
+  document.getElementById('blushR').setAttribute('fill','#1a7a08');
+  document.getElementById('earL').style.animation='';document.getElementById('earL').setAttribute('fill','#39ff14');
+  document.getElementById('earR').style.animation='';document.getElementById('earR').setAttribute('fill','#39ff14');
+  document.getElementById('led1').style.animation='';document.getElementById('led1').setAttribute('fill','#39ff14');document.getElementById('led1').style.opacity='.7';
+  document.getElementById('led2').style.animation='';document.getElementById('led2').setAttribute('fill','#1a7a08');document.getElementById('led2').style.opacity='1';
+  _setMouth('smile');
+}
 function setFace(mood){
-  var eg = document.getElementById('eyeGrp');
-  eg.className = 'eye-grp';
-  document.getElementById('blushL').style.opacity = '.6';
-  document.getElementById('blushR').style.opacity = '.6';
-  if(mood === 'listen'){ eg.classList.add('listen'); }
-  else if(mood === 'happy'){
+  _resetRobot();
+  var svg=document.querySelector('.robot-svg');
+  var eg=document.getElementById('eyeGrp');
+
+  if(mood===''){
+    // 預設待機
+    _setMouth('smile');
+
+  } else if(mood==='boot'){
+    // 開機：眼睛掃描左右、耳朵交替閃、LED脈衝
+    eg.style.animation='eyeScan 1s ease-in-out infinite';
+    document.getElementById('earL').style.animation='earFlash .5s ease-in-out infinite';
+    document.getElementById('earR').style.animation='earAlt .5s ease-in-out infinite';
+    document.getElementById('led1').style.animation='ledPulse .4s ease-in-out infinite';
+    document.getElementById('led2').style.animation='ledPulse .4s ease-in-out .2s infinite';
+    _setMouth('flat');
+
+  } else if(mood==='warmup'){
+    // 暖機：眼睛緩慢左右思考
+    eg.style.animation='eyeThink 1.8s ease-in-out infinite';
+    _eyePupils(33,30,10,8,65,30,10,8);
+    _setMouth('flat');
+    document.getElementById('led1').style.animation='ledPulse .9s ease-in-out infinite';
+    document.getElementById('led2').style.animation='ledPulse .9s ease-in-out .45s infinite';
+
+  } else if(mood==='listen'){
+    // 聆聽：眼睛向上、耳朵快閃、嘴巴張開
+    eg.classList.add('listen');
+    _eyePupils(33,29,12,10,65,29,12,10);
+    document.getElementById('earL').style.animation='earFlash .35s ease-in-out infinite';
+    document.getElementById('earR').style.animation='earFlash .35s ease-in-out .17s infinite';
+    _setMouth('open');
+    svg.style.animation='headNod 1.2s ease-in-out infinite';
+
+  } else if(mood==='think'){
+    // 思考中：眼睛看右上、一字嘴
+    _eyePupils(36,30,9,8,68,30,9,8);
+    _setMouth('flat');
+
+  } else if(mood==='happy'){
+    // 開心：大眼睛、大笑、腮紅亮、彈跳
     eg.classList.add('happy');
-    document.getElementById('blushL').style.opacity = '1';
-    document.getElementById('blushR').style.opacity = '1';
+    _eyePupils(30,30,15,12,62,30,15,12);
+    document.getElementById('blushL').style.opacity='1';
+    document.getElementById('blushR').style.opacity='1';
+    document.getElementById('blushL').setAttribute('fill','#39ff14');
+    document.getElementById('blushR').setAttribute('fill','#39ff14');
+    _setMouth('big');
+    document.getElementById('earL').setAttribute('fill','#39ff14');
+    document.getElementById('earR').setAttribute('fill','#39ff14');
+    document.getElementById('led1').setAttribute('fill','#39ff14');document.getElementById('led1').style.opacity='1';
+    document.getElementById('led2').setAttribute('fill','#39ff14');document.getElementById('led2').style.opacity='1';
+    svg.style.animation='happyBounce .45s ease-in-out 3';
+    setTimeout(function(){ svg.style.animation=''; }, 1500);
+
+  } else if(mood==='error'){
+    // 錯誤：小眼睛往下、苦臉、LED紅
+    _eyePupils(35,35,8,7,67,35,8,7);
+    _setMouth('frown');
+    document.getElementById('led1').setAttribute('fill','#ff2222');document.getElementById('led1').style.opacity='1';
+    document.getElementById('led2').setAttribute('fill','#ff2222');document.getElementById('led2').style.opacity='1';
+    svg.style.animation='robotShake .35s ease-in-out 2';
+    setTimeout(function(){ svg.style.animation=''; }, 800);
   }
 }
 
@@ -278,12 +402,14 @@ var _warmupIv = null;
 function warmUp(cb){
   var startT = Date.now();
   typeText('系統暖機中...\n首次啟動約需 10 秒');
+  setFace('warmup');
   if(_audioReady) _warmupIv = playWarmup();
   jsonp(GAS_URL + '?action=getOpenSession', function(err, data){
     var elapsed = ((Date.now() - startT) / 1000).toFixed(1);
     console.log('暖機完成，耗時 ' + elapsed + ' 秒');
     if(_warmupIv){ clearInterval(_warmupIv); _warmupIv=null; }
     if(_audioReady) playWarmupDone();
+    setFace('');
     cb(err, data);
   });
 }
@@ -291,6 +417,7 @@ function warmUp(cb){
 function init(){
   setStatus('', '連線中');
   if(_audioReady) playBoot();
+  setFace('boot');
   warmUp(function(err, data){
     if(!err && data && data.ok && data.sessionId){
       GARDEN_URL = data.gardenUrl || '';
@@ -459,6 +586,7 @@ function rand(a){ return a[Math.floor(Math.random() * a.length)]; }
 
 function processCheckin(studentId){
   setStatus('on', '處理中');
+  setFace('think');
   typeText(rand(CONFIRMS) + '\n學號：' + studentId);
   doLookup(studentId);
 }
@@ -492,6 +620,7 @@ function doLookup(studentId){
     if(err || !data || !data.ok || !data.name){
       setFace(''); setStatus('err', '找不到');
       playError();
+      setFace('error');
       typeText(rand(NOTFOUND));
       speak('找不到這個學號，請再說一次。', function(){ setStatus('on', '就緒'); });
       return;
