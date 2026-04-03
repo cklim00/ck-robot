@@ -174,6 +174,7 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
       <button class="diag-btn" id="audioToggle" onclick="toggleAudio()" title="音效開關">🔊</button>
     <button class="diag-btn" onclick="exportCSV()" title="下載本地出席備份">💾</button>
       <button class="diag-btn" onclick="runDiag()">診斷</button>
+      <button class="diag-btn" id="endBtnBar" onclick="endRollCall()" style="border-color:#ff4444;color:#ff6666;display:none">⏹ 結束點名</button>
     </span>
   </div>
 </div>
@@ -482,6 +483,9 @@ function confirmSession(){
   var a = document.getElementById('scArea'); if(a) a.remove();
   setStatus('on', '就緒'); setFace('');
   playSessionConfirm();
+  // 顯示底部結束點名按鈕
+  var eb = document.getElementById('endBtnBar');
+  if (eb) eb.style.display = 'inline-block';
   typeText('場次：'+SESSION_ID+'\n大家好！我是點名小CK！\n請按按鈕說出學號！');
   speak('大家好！我是點名小CK！請說出你的學號完成點名！');
   addGardenBtn();
@@ -504,15 +508,7 @@ function addGardenBtn(){
   btn.onclick = function(){ window.open(GARDEN_URL, '_blank'); };
   document.querySelector('.robot-area').appendChild(btn);
 
-  // ── 結束點名按鈕（花園旁邊）──────────────────────
-  if (!document.getElementById('endBtn')) {
-    var endBtn = document.createElement('button');
-    endBtn.id = 'endBtn';
-    endBtn.textContent = '⏹ 結束點名';
-    endBtn.style.cssText = 'background:rgba(255,60,60,.12);border:2px solid #ff4444;color:#ff6666;font-family:VT323,monospace;font-size:16px;padding:4px 12px;cursor:pointer;margin-top:4px;margin-left:6px;display:block;width:calc(100% - 4px);';
-    endBtn.onclick = endRollCall;
-    document.querySelector('.robot-area').appendChild(endBtn);
-  }
+
 }
 
 function showManualInput(){
@@ -1301,8 +1297,8 @@ function endRollCall() {
   setStatus('on', '點名結束');
 
   // 按鈕變灰
-  var b = document.getElementById('endBtn');
-  if (b) { b.disabled=true; b.textContent='✅ 已結束'; b.style.opacity='.4'; }
+  var b = document.getElementById('endBtnBar');
+  if (b) { b.disabled=true; b.textContent='✅ 已結束'; b.style.opacity='.5'; }
 
   // ── 依出席率選訊息 + 表情序列 ────────────────────────────────────────────
   if (rate >= 90) {
