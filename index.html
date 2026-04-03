@@ -128,7 +128,8 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
     <span><span class="dot" id="dot"></span><span id="statusTxt">連線中</span></span>
     <span id="cntDisplay">已簽到 <b id="cntN">0</b><span id="cntTotal">/0</span> 人</span>
     <span>
-      <button class="diag-btn" onclick="exportCSV()" title="下載本地出席備份">💾</button>
+      <button class="diag-btn" id="audioToggle" onclick="toggleAudio()" title="音效開關">🔊</button>
+    <button class="diag-btn" onclick="exportCSV()" title="下載本地出席備份">💾</button>
       <button class="diag-btn" onclick="runDiag()">診斷</button>
     </span>
   </div>
@@ -378,6 +379,7 @@ function startListen(){
   setFace('listen');
   setStatus('on', '聆聽中');
   typeText('請說出你的學號...');
+  startListenSound();
 
   recognition.onresult = function(e){
     var heard = '';
@@ -408,6 +410,7 @@ function startListen(){
 }
 
 function resetBtn(){
+  stopListenSound();
   isListening = false;
   var btn = document.getElementById('micBtn');
   btn.classList.remove('rec');
@@ -470,6 +473,7 @@ function doLookup(studentId){
     console.log('查名回傳：', JSON.stringify(data));
     if(err || !data || !data.ok || !data.name){
       setFace(''); setStatus('err', '找不到');
+      playError();
       typeText(rand(NOTFOUND));
       speak('找不到這個學號，請再說一次。', function(){ setStatus('on', '就緒'); });
       return;
@@ -486,6 +490,7 @@ function doLookup(studentId){
     });
     setFace('happy');
     typeText(rand(SUCCESS).replace('{n}', sName));
+    playSuccess();
     speak(sName + '，簽到成功！花朵種好了！', function(){ setFace(''); setStatus('on', '就緒'); });
     addTag(sName);
     checkinCount++;
@@ -610,6 +615,181 @@ document.addEventListener('keydown', function(e){
   }
 });
 
+
+// ════════════════════════════════════
+// 🔊 音效引擎（太空站環境音）
+// ════════════════════════════════════
+var _actx = null, _master = null, _audioOn = true, _audioReady = false;
+var _listenPing = null;
+
+function initAudio() {
+  if (_actx) return;
+  try {
+    _actx = new (window.AudioContext || window.webkitAudioContext)();
+    _master = _actx.createGain();
+    _master.gain.value = 0.45;
+    _master.connect(_actx.destination);
+    _audioReady = true;
+    playStartup();
+    setTimeout(startAmbient, 800);
+  } catch(e) { console.log('audio init failed:', e); }
+}
+
+// AudioContext 心跳，防止被瀏覽器暫停
+setInterval(function() {
+  if (_actx && _actx.state === 'suspended') _actx.resume();
+}, 1000);
+
+function toggleAudio() {
+  if (!_actx) { initAudio(); return; }
+  _audioOn = !_audioOn;
+  if (_master) _master.gain.setTargetAtTime(_audioOn ? 0.45 : 0, _actx.currentTime, 0.4);
+  var btn = document.getElementById('audioToggle');
+  if (btn) btn.textContent = _audioOn ? '🔊' : '🔇';
+}
+
+// ── 太空站環境音 ─────────────────────────────────────────────────────────────
+function startAmbient() {
+  if (!_actx || !_audioReady) return;
+
+  // 低頻嗡嗡（60Hz）
+  var hum = _actx.createOscillator();
+  var humG = _actx.createGain();
+  hum.type = 'sine'; hum.frequency.value = 60; humG.gain.value = 0.07;
+  hum.connect(humG); humG.connect(_master); hum.start();
+
+  // 中頻電流（180Hz + LFO）
+  var drone = _actx.createOscillator();
+  var droneG = _actx.createGain();
+  var lfo = _actx.createOscillator();
+  var lfoG = _actx.createGain();
+  drone.type = 'sawtooth'; drone.frequency.value = 180;
+  lfo.frequency.value = 0.25; lfoG.gain.value = 12;
+  lfo.connect(lfoG); lfoG.connect(drone.frequency);
+  var df = _actx.createBiquadFilter();
+  df.type = 'lowpass'; df.frequency.value = 380;
+  droneG.gain.value = 0.022;
+  drone.connect(df); df.connect(droneG); droneG.connect(_master);
+  drone.start(); lfo.start();
+
+  // 白噪音（空調通風）
+  var bufSz = _actx.sampleRate * 4;
+  var nBuf = _actx.createBuffer(1, bufSz, _actx.sampleRate);
+  var nd = nBuf.getChannelData(0);
+  for (var i = 0; i < bufSz; i++) nd[i] = (Math.random() * 2 - 1);
+  var noise = _actx.createBufferSource();
+  noise.buffer = nBuf; noise.loop = true;
+  var nf = _actx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 160;
+  var nG = _actx.createGain(); nG.gain.value = 0.05;
+  noise.connect(nf); nf.connect(nG); nG.connect(_master); noise.start();
+
+  // 高頻細微電磁聲（800Hz）
+  var hi = _actx.createOscillator();
+  var hiG = _actx.createGain();
+  hi.type = 'sine'; hi.frequency.value = 800; hiG.gain.value = 0.008;
+  hi.connect(hiG); hiG.connect(_master); hi.start();
+
+  scheduleBlip();
+}
+
+// 隨機電子嗶聲（5~12秒一次）
+function scheduleBlip() {
+  if (!_actx) return;
+  setTimeout(function() {
+    if (_audioOn && _actx) playBlip();
+    scheduleBlip();
+  }, 5000 + Math.random() * 7000);
+}
+function playBlip() {
+  if (!_actx) return;
+  var now = _actx.currentTime;
+  var freqs = [880, 1100, 1320, 660, 1760, 550];
+  var f = freqs[Math.floor(Math.random() * freqs.length)];
+  var o = _actx.createOscillator(); var g = _actx.createGain();
+  o.type = 'sine'; o.frequency.value = f;
+  g.gain.setValueAtTime(0, now);
+  g.gain.linearRampToValueAtTime(0.05, now + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+  o.connect(g); g.connect(_master); o.start(now); o.stop(now + 0.22);
+}
+
+// ── 系統啟動音 ───────────────────────────────────────────────────────────────
+function playStartup() {
+  if (!_actx) return;
+  var now = _actx.currentTime;
+  // 上升掃頻
+  var sw = _actx.createOscillator(); var swG = _actx.createGain();
+  sw.type = 'sawtooth';
+  sw.frequency.setValueAtTime(60, now);
+  sw.frequency.exponentialRampToValueAtTime(900, now + 1.4);
+  swG.gain.setValueAtTime(0, now);
+  swG.gain.linearRampToValueAtTime(0.1, now + 0.15);
+  swG.gain.exponentialRampToValueAtTime(0.001, now + 1.6);
+  var swF = _actx.createBiquadFilter(); swF.type = 'bandpass'; swF.frequency.value = 500;
+  sw.connect(swF); swF.connect(swG); swG.connect(_master);
+  sw.start(now); sw.stop(now + 1.7);
+  // 確認嗶嗶聲
+  [[440, 0.6],[550, 0.85],[660, 1.1],[880, 1.3]].forEach(function(n) {
+    var o = _actx.createOscillator(); var g = _actx.createGain();
+    o.type = 'square'; o.frequency.value = n[0];
+    g.gain.setValueAtTime(0, now + n[1]);
+    g.gain.linearRampToValueAtTime(0.07, now + n[1] + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, now + n[1] + 0.13);
+    o.connect(g); g.connect(_master); o.start(now + n[1]); o.stop(now + n[1] + 0.16);
+  });
+}
+
+// ── 簽到成功音（叮～升調） ──────────────────────────────────────────────────
+function playSuccess() {
+  if (!_actx || !_audioOn) return;
+  var now = _actx.currentTime;
+  [[523.25,0],[659.25,0.1],[783.99,0.21],[1046.5,0.34]].forEach(function(n) {
+    var o = _actx.createOscillator(); var g = _actx.createGain();
+    o.type = 'sine'; o.frequency.value = n[0];
+    g.gain.setValueAtTime(0, now + n[1]);
+    g.gain.linearRampToValueAtTime(0.18, now + n[1] + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, now + n[1] + 0.55);
+    o.connect(g); g.connect(_master); o.start(now + n[1]); o.stop(now + n[1] + 0.6);
+  });
+}
+
+// ── 找不到學號（錯誤音） ────────────────────────────────────────────────────
+function playError() {
+  if (!_actx || !_audioOn) return;
+  var now = _actx.currentTime;
+  [[280,0],[220,0.18],[160,0.36]].forEach(function(n) {
+    var o = _actx.createOscillator(); var g = _actx.createGain();
+    o.type = 'sawtooth'; o.frequency.value = n[0];
+    g.gain.setValueAtTime(0.14, now + n[1]);
+    g.gain.exponentialRampToValueAtTime(0.001, now + n[1] + 0.28);
+    var f = _actx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700;
+    o.connect(f); f.connect(g); g.connect(_master);
+    o.start(now + n[1]); o.stop(now + n[1] + 0.32);
+  });
+}
+
+// ── 麥克風聆聽中（雷達 ping） ───────────────────────────────────────────────
+function startListenSound() {
+  if (!_actx) return;
+  stopListenSound();
+  function ping() {
+    if (!_actx || !_audioOn) return;
+    var now = _actx.currentTime;
+    var o = _actx.createOscillator(); var g = _actx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(1400, now);
+    o.frequency.exponentialRampToValueAtTime(350, now + 0.5);
+    g.gain.setValueAtTime(0.09, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    o.connect(g); g.connect(_master); o.start(now); o.stop(now + 0.55);
+  }
+  ping();
+  _listenPing = setInterval(ping, 1800);
+}
+function stopListenSound() {
+  if (_listenPing) { clearInterval(_listenPing); _listenPing = null; }
+}
+
 // ════════════════════════════════════
 // 啟動
 // ════════════════════════════════════
@@ -617,6 +797,11 @@ window.addEventListener('load', function(){
   loadVoices();
   setTimeout(init, 600);
 });
+// 第一次用戶互動時解鎖音效
+document.addEventListener('click', function onFirstClick(){
+  initAudio();
+  document.removeEventListener('click', onFirstClick);
+}, {once: true});
 </script>
 </body>
 </html>
