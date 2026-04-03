@@ -631,7 +631,7 @@ function initAudio() {
     _master.connect(_actx.destination);
     _audioReady = true;
     playStartup();
-    setTimeout(startAmbient, 800);
+    startAmbient();
   } catch(e) { console.log('audio init failed:', e); }
 }
 
@@ -652,43 +652,7 @@ function toggleAudio() {
 function startAmbient() {
   if (!_actx || !_audioReady) return;
 
-  // 低頻嗡嗡（60Hz）
-  var hum = _actx.createOscillator();
-  var humG = _actx.createGain();
-  hum.type = 'sine'; hum.frequency.value = 60; humG.gain.value = 0.07;
-  hum.connect(humG); humG.connect(_master); hum.start();
-
-  // 中頻電流（180Hz + LFO）
-  var drone = _actx.createOscillator();
-  var droneG = _actx.createGain();
-  var lfo = _actx.createOscillator();
-  var lfoG = _actx.createGain();
-  drone.type = 'sawtooth'; drone.frequency.value = 180;
-  lfo.frequency.value = 0.25; lfoG.gain.value = 12;
-  lfo.connect(lfoG); lfoG.connect(drone.frequency);
-  var df = _actx.createBiquadFilter();
-  df.type = 'lowpass'; df.frequency.value = 380;
-  droneG.gain.value = 0.022;
-  drone.connect(df); df.connect(droneG); droneG.connect(_master);
-  drone.start(); lfo.start();
-
-  // 白噪音（空調通風）
-  var bufSz = _actx.sampleRate * 4;
-  var nBuf = _actx.createBuffer(1, bufSz, _actx.sampleRate);
-  var nd = nBuf.getChannelData(0);
-  for (var i = 0; i < bufSz; i++) nd[i] = (Math.random() * 2 - 1);
-  var noise = _actx.createBufferSource();
-  noise.buffer = nBuf; noise.loop = true;
-  var nf = _actx.createBiquadFilter(); nf.type = 'lowpass'; nf.frequency.value = 160;
-  var nG = _actx.createGain(); nG.gain.value = 0.05;
-  noise.connect(nf); nf.connect(nG); nG.connect(_master); noise.start();
-
-  // 高頻細微電磁聲（800Hz）
-  var hi = _actx.createOscillator();
-  var hiG = _actx.createGain();
-  hi.type = 'sine'; hi.frequency.value = 800; hiG.gain.value = 0.008;
-  hi.connect(hiG); hiG.connect(_master); hi.start();
-
+  // 隨機電子嗶聲（保留）
   scheduleBlip();
 }
 
