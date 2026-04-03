@@ -22,6 +22,13 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .btext{font-size:22px;color:var(--green);line-height:1.35;min-height:40px}
 .cursor{display:inline-block;width:10px;height:18px;background:var(--green);margin-left:2px;vertical-align:middle;animation:blink .7s step-end infinite}
 @keyframes blink{50%{opacity:0}}
+
+/* ── 啟動覆蓋層 ── */
+.start-overlay{position:fixed;inset:0;background:#060e06;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:16px}
+.start-icon{font-size:3rem;animation:pulse 1.2s ease-in-out infinite alternate}
+@keyframes pulse{from{opacity:.5;transform:scale(.95)}to{opacity:1;transform:scale(1.05)}}
+.start-title{font-family:'Press Start 2P',monospace;font-size:11px;color:#39ff14;text-shadow:0 0 12px #39ff14;letter-spacing:2px}
+.start-sub{font-size:14px;color:#1a7a08;font-family:'VT323',monospace}
 .mic-btn{background:transparent;border:3px solid var(--gdim);color:var(--green);font-family:'Press Start 2P',monospace;font-size:7px;padding:7px 14px;cursor:pointer;box-shadow:3px 3px 0 var(--dark);transition:all .1s;letter-spacing:1px}
 .mic-btn:hover{background:var(--dark);box-shadow:1px 1px 0 var(--dark);transform:translate(2px,2px)}
 .mic-btn.rec{border-color:var(--green);background:var(--dark);animation:mpulse .4s ease-in-out infinite alternate}
@@ -56,6 +63,11 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 </style>
 </head>
 <body>
+<div class="start-overlay" id="startOverlay" onclick="onStartClick()">
+  <div class="start-icon">🤖</div>
+  <div class="start-title">▸ 點名小CK ◂</div>
+  <div class="start-sub">[ 點擊任意處啟動系統 ]</div>
+</div>
 <iframe name="ck_write_frame" style="display:none"></iframe>
 <div class="wrap">
   <div class="topbar">
@@ -825,15 +837,21 @@ function stopListenSound() {
 // ════════════════════════════════════
 // 啟動
 // ════════════════════════════════════
-window.addEventListener('load', function(){
+function onStartClick(){
+  var overlay = document.getElementById('startOverlay');
+  if(overlay){
+    overlay.style.transition = 'opacity .4s';
+    overlay.style.opacity = '0';
+    setTimeout(function(){ overlay.style.display='none'; }, 400);
+  }
   loadVoices();
-  setTimeout(init, 600);
+  initAudio();          // 音效在用戶點擊後立即解鎖
+  setTimeout(init, 200); // 短暫延遲讓啟動音先播
+}
+
+window.addEventListener('load', function(){
+  // 不自動 init，等用戶點擊 overlay
 });
-// 第一次用戶互動時解鎖音效
-document.addEventListener('click', function onFirstClick(){
-  initAudio();
-  document.removeEventListener('click', onFirstClick);
-}, {once: true});
 </script>
 </body>
 </html>
