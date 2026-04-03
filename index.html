@@ -872,28 +872,33 @@ function getCheerPool(stats) {
   if (!stats || !stats.ok) return CHEERS_GENERAL;
   if (stats.isFirst)   return CHEERS_FIRST;
   if (stats.isPerfect) return CHEERS_PERFECT;
-  if (stats.rate >= 80) return CHEERS_HIGH;
-  if (stats.rate >= 60) return CHEERS_MID;
-  return CHEERS_LOW;
+  // 出席 5 次以上，給更熱烈的鼓勵
+  if (stats.attended >= 5) return CHEERS_HIGH;
+  return CHEERS_GENERAL;
 }
 
 // ── 根據出席率產生主訊息 ─────────────────────────────────────────────────────
 function getPersonalMsg(sName, stats) {
   if (!stats || !stats.ok) return null;
-  var a = stats.attended, t = stats.total, r = stats.rate;
-  var msg = '';
-  if (stats.isFirst) {
-    msg = '首次出席！歡迎 ' + sName + '！\n';
-  } else if (stats.isPerfect) {
-    msg = sName + ' 全勤 ' + a + '/' + t + ' 場 💯\n出席率 100%！傳奇！';
-  } else if (r >= 80) {
-    msg = sName + ' 已出席 ' + a + '/' + t + ' 場\n出席率 ' + r + '% ⭐ 非常認真！';
-  } else if (r >= 60) {
-    msg = sName + ' 已出席 ' + a + '/' + t + ' 場\n出席率 ' + r + '%，繼續加油！';
-  } else {
-    msg = sName + ' 今天第 ' + a + ' 次出席\n出席率 ' + r + '%，多來幾次更好 💪';
+  var a = stats.attended;   // 本次含在內的出席次數
+  var t = stats.total;      // 課程總場次
+
+  // 全勤：出席次數 = 總場次（且超過 1 次）
+  if (a === t && a >= 2) {
+    return sName + ' 全勤！\n共 ' + t + ' 次點名，一次都沒缺 🏆';
   }
-  return msg;
+
+  // 第一次
+  if (a === 1) {
+    return '歡迎 ' + sName + '！\n今天是本學期第一次出席 🌱';
+  }
+
+  // 其他：只說第幾次，簡單正向
+  var suffix = '';
+  if (a >= 10) suffix = '\n資深出席者！';
+  else if (a >= 5) suffix = '\n出席很穩定！';
+
+  return sName + ' 今天第 ' + a + ' 次出席！' + suffix;
 }
 // ── 花朵飄上特效 ─────────────────────────────────────────────────────────────
 var FLOWER_COLORS = ['#FF6B9D','#FFB347','#87CEEB','#98FB98','#DDA0DD','#F0E68C','#FF8C94','#B8E994','#A29BFE','#FD79A8','#55EFC4','#FDCB6E'];
