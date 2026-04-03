@@ -23,6 +23,15 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 .cursor{display:inline-block;width:10px;height:18px;background:var(--green);margin-left:2px;vertical-align:middle;animation:blink .7s step-end infinite}
 @keyframes blink{50%{opacity:0}}
 
+
+/* ── 花朵飄上特效 ── */
+.float-flower{position:fixed;bottom:-80px;pointer-events:none;z-index:500;animation:flowerFloat linear forwards}
+@keyframes flowerFloat{
+  0%  {transform:translateY(0) rotate(0deg) scale(.6);opacity:0}
+  10% {opacity:1}
+  80% {opacity:.9}
+  100%{transform:translateY(-110vh) rotate(360deg) scale(1.1);opacity:0}
+}
 /* ── 啟動覆蓋層 ── */
 .start-overlay{position:fixed;inset:0;background:#060e06;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;gap:16px}
 .start-icon{font-size:3rem;animation:pulse 1.2s ease-in-out infinite alternate}
@@ -803,6 +812,126 @@ function startAmbient() {
   scheduleBlip();
 }
 
+
+// ── 花朵飄上特效 ─────────────────────────────────────────────────────────────
+var FLOWER_COLORS = ['#FF6B9D','#FFB347','#87CEEB','#98FB98','#DDA0DD','#F0E68C','#FF8C94','#B8E994','#A29BFE','#FD79A8','#55EFC4','#FDCB6E'];
+
+function spawnFlowers(count) {
+  count = count || 12;
+  for (var i = 0; i < count; i++) {
+    (function(idx) {
+      setTimeout(function() {
+        var color  = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+        var size   = 28 + Math.random() * 28;
+        var left   = 5 + Math.random() * 90;
+        var dur    = 2.2 + Math.random() * 2.0;
+        var stage  = Math.floor(Math.random() * 4); // 0~3 花朵階段
+
+        var el = document.createElement('div');
+        el.className = 'float-flower';
+        el.style.left  = left + 'vw';
+        el.style.animationDuration = dur + 's';
+
+        var svg = makeMiniFlower(color, size, stage);
+        el.appendChild(svg);
+        document.body.appendChild(el);
+        setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, (dur + 0.3) * 1000);
+      }, idx * 130 + Math.random() * 120);
+    })(i);
+  }
+}
+
+function makeMiniFlower(color, size, stage) {
+  var NS = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('width', size);
+  svg.setAttribute('height', size * 1.2);
+  svg.setAttribute('viewBox', '0 0 44 52');
+  svg.setAttribute('overflow', 'visible');
+
+  // 莖
+  var stem = document.createElementNS(NS, 'rect');
+  stem.setAttribute('x','21'); stem.setAttribute('y','18');
+  stem.setAttribute('width','2'); stem.setAttribute('height','32');
+  stem.setAttribute('fill','#2a5c38'); stem.setAttribute('rx','1');
+  svg.appendChild(stem);
+
+  var fc = {x:22, y:14};
+  var hg = document.createElementNS(NS, 'g');
+
+  if (stage === 0) {
+    // 花苞
+    var bud = document.createElementNS(NS, 'ellipse');
+    bud.setAttribute('cx','22'); bud.setAttribute('cy','14');
+    bud.setAttribute('rx','4'); bud.setAttribute('ry','7');
+    bud.setAttribute('fill', color);
+    hg.appendChild(bud);
+  } else {
+    var pc = stage===1?4:stage===2?5:6;
+    var pd = stage===1?4.5:stage===2?6:7.5;
+    var rx = stage===1?2:stage===2?3.2:4;
+    var ry = stage===1?5.5:stage===2?6.5:7.5;
+    var aS = 360/pc, aO = Math.random()*aS;
+    for (var i=0;i<pc;i++){
+      var a=i*aS+aO, ar=a*Math.PI/180;
+      var px=fc.x+pd*Math.sin(ar), py=fc.y-pd*Math.cos(ar);
+      var el=document.createElementNS(NS,'ellipse');
+      el.setAttribute('cx',px.toFixed(1)); el.setAttribute('cy',py.toFixed(1));
+      el.setAttribute('rx',rx+''); el.setAttribute('ry',ry+'');
+      el.setAttribute('fill',color); el.setAttribute('opacity','.93');
+      el.setAttribute('transform','rotate('+a.toFixed(1)+',22,14)');
+      hg.appendChild(el);
+    }
+    var c1=document.createElementNS(NS,'circle');
+    c1.setAttribute('cx','22'); c1.setAttribute('cy','14');
+    c1.setAttribute('r', stage===3?'5':'3.5');
+    c1.setAttribute('fill','#fff9e6'); hg.appendChild(c1);
+    var c2=document.createElementNS(NS,'circle');
+    c2.setAttribute('cx','22'); c2.setAttribute('cy','14');
+    c2.setAttribute('r', stage===3?'3.2':'2');
+    c2.setAttribute('fill','#f5c040'); hg.appendChild(c2);
+  }
+  svg.appendChild(hg);
+  return svg;
+}
+
+// ── 超級開心（簽到成功專用）─────────────────────────────────────────────────
+function setFaceSuper() {
+  _resetRobot();
+  var svg = document.querySelector('.robot-svg');
+  var eg  = document.getElementById('eyeGrp');
+
+  // 眼睛：超大瞳孔 + happy 動畫
+  eg.classList.add('happy');
+  _eyePupils(29, 29, 16, 14, 61, 29, 16, 14);
+
+  // 腮紅：全綠全亮
+  document.getElementById('blushL').style.opacity = '1';
+  document.getElementById('blushR').style.opacity = '1';
+  document.getElementById('blushL').setAttribute('fill','#39ff14');
+  document.getElementById('blushR').setAttribute('fill','#39ff14');
+
+  // 嘴巴：超大笑（手動設定比 big 更誇張）
+  var r = document.getElementById('mouth').querySelectorAll('rect');
+  for(var i=0;i<r.length;i++) r[i].style.display='';
+  r[0].setAttribute('x','31'); r[0].setAttribute('y','57'); r[0].setAttribute('width','4'); r[0].setAttribute('height','3'); r[0].setAttribute('fill','#39ff14');
+  r[1].setAttribute('x','35'); r[1].setAttribute('y','61'); r[1].setAttribute('width','4'); r[1].setAttribute('height','3'); r[1].setAttribute('fill','#39ff14');
+  r[2].setAttribute('x','39'); r[2].setAttribute('y','63'); r[2].setAttribute('width','32'); r[2].setAttribute('height','5'); r[2].setAttribute('fill','#39ff14');
+  r[3].setAttribute('x','71'); r[3].setAttribute('y','61'); r[3].setAttribute('width','4'); r[3].setAttribute('height','3'); r[3].setAttribute('fill','#39ff14');
+  r[4].setAttribute('x','75'); r[4].setAttribute('y','57'); r[4].setAttribute('width','4'); r[4].setAttribute('height','3'); r[4].setAttribute('fill','#39ff14');
+
+  // LED 全亮
+  document.getElementById('led1').setAttribute('fill','#39ff14'); document.getElementById('led1').style.opacity='1';
+  document.getElementById('led2').setAttribute('fill','#39ff14'); document.getElementById('led2').style.opacity='1';
+
+  // 耳朵快閃
+  document.getElementById('earL').style.animation='earFlash .25s ease-in-out infinite';
+  document.getElementById('earR').style.animation='earFlash .25s ease-in-out .12s infinite';
+
+  // 頭部：彈跳 3 次，然後搖擺
+  svg.style.animation='happyBounce .35s ease-in-out 4';
+  setTimeout(function(){ svg.style.animation=''; }, 1600);
+}
 // 隨機電子嗶聲（5~12秒一次）
 function scheduleBlip() {
   if (!_actx) return;
