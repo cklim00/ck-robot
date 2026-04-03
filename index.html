@@ -109,10 +109,10 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
       <g class="eye-grp" id="eyeGrp">
         <rect x="28" y="28" width="22" height="18" fill="#071208" stroke="#1a7a08" stroke-width="2"/>
         <rect x="33" y="32" width="12" height="10" fill="#39ff14" id="eyeLP"/>
-        <rect x="37" y="34" width="4" height="4" fill="#071208"/>
+        <rect x="37" y="34" width="4" height="4" fill="#071208" id="dotL"/>
         <rect x="60" y="28" width="22" height="18" fill="#071208" stroke="#1a7a08" stroke-width="2"/>
         <rect x="65" y="32" width="12" height="10" fill="#39ff14" id="eyeRP"/>
-        <rect x="69" y="34" width="4" height="4" fill="#071208"/>
+        <rect x="69" y="34" width="4" height="4" fill="#071208" id="dotR"/>
       </g>
       <rect x="52" y="50" width="6" height="4" fill="#1a7a08"/>
       <g id="mouth">
@@ -225,10 +225,10 @@ function _eyePupils(lx,ly,lw,lh,rx,ry,rw,rh){
   var lp=document.getElementById('eyeLP'),rp=document.getElementById('eyeRP');
   lp.setAttribute('x',lx);lp.setAttribute('y',ly);lp.setAttribute('width',lw);lp.setAttribute('height',lh);
   rp.setAttribute('x',rx);rp.setAttribute('y',ry);rp.setAttribute('width',rw);rp.setAttribute('height',rh);
-  // 瞳孔內的黑點跟著移動
-  var dots=document.querySelectorAll('#eyeGrp rect[fill="#071208"]');
-  if(dots[0]){dots[0].setAttribute('x',lx+4);dots[0].setAttribute('y',ly+2);}
-  if(dots[1]){dots[1].setAttribute('x',rx+4);dots[1].setAttribute('y',ry+2);}
+  // 黑點（用 ID 精確選取，避免選到眼框）
+  var dotL=document.getElementById('dotL'),dotR=document.getElementById('dotR');
+  if(dotL){dotL.setAttribute('x',lx+4);dotL.setAttribute('y',ly+2);}
+  if(dotR){dotR.setAttribute('x',rx+4);dotR.setAttribute('y',ry+2);}
 }
 function _setMouth(type){
   var r=document.getElementById('mouth').querySelectorAll('rect');
@@ -258,7 +258,7 @@ function _setMouth(type){
   } else if(type==='open'){
     // 張口（聆聽/驚訝）
     r[0].style.display='none';r[1].style.display='none';r[3].style.display='none';r[4].style.display='none';
-    r[2].setAttribute('x','38');r[2].setAttribute('y','61');r[2].setAttribute('width','34');r[2].setAttribute('height','7');r[2].setAttribute('fill','#39ff14');
+    r[2].setAttribute('x','40');r[2].setAttribute('y','63');r[2].setAttribute('width','29');r[2].setAttribute('height','5');r[2].setAttribute('fill','#39ff14');
   } else if(type==='flat'){
     // 一字型（思考/暖機）
     r[0].style.display='none';r[1].style.display='none';r[3].style.display='none';r[4].style.display='none';
@@ -308,13 +308,11 @@ function setFace(mood){
     document.getElementById('led2').style.animation='ledPulse .9s ease-in-out .45s infinite';
 
   } else if(mood==='listen'){
-    // 聆聽：眼睛向上、耳朵快閃、嘴巴張開
-    eg.classList.add('listen');
+    // 聆聽：眼睛向上、耳朵快閃、嘴巴微張
     _eyePupils(33,29,12,10,65,29,12,10);
-    document.getElementById('earL').style.animation='earFlash .35s ease-in-out infinite';
-    document.getElementById('earR').style.animation='earFlash .35s ease-in-out .17s infinite';
+    document.getElementById('earL').style.animation='earFlash .4s ease-in-out infinite';
+    document.getElementById('earR').style.animation='earFlash .4s ease-in-out .2s infinite';
     _setMouth('open');
-    svg.style.animation='headNod 1.2s ease-in-out infinite';
 
   } else if(mood==='think'){
     // 思考中：眼睛看右上、一字嘴
@@ -647,6 +645,8 @@ function doLookup(studentId){
     setFace('happy');
     typeText(rand(SUCCESS).replace('{n}', sName));
     playSuccess();
+    setFaceSuper();
+    spawnFlowers(14);
     speak(sName + '，簽到成功！花朵種好了！', function(){ setFace(''); setStatus('on', '就緒'); });
     addTag(sName);
     checkinCount++;
