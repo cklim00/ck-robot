@@ -1307,10 +1307,7 @@ function endRollCall() {
   // ── 依出席率選訊息 + 表情序列 ────────────────────────────────────────────
   if (rate >= 90) {
     // 🏆 超高：超級開心 + 花朵慶祝
-    typeText('⏹ 點名結束
-出席 ' + present + '/' + (total||'?') + ' 位
-出席率 ' + rate + '%！太棒了！！
-幾乎全員到齊！大家好厲害！');
+    typeText('⏹ 點名結束\n出席 ' + present + '/' + (total||'?') + ' 位\n出席率 ' + rate + '%！太棒了！！\n幾乎全員到齊！大家好厲害！');
     setFaceSuper();
     spawnFlowers(10, {ok:true, isPerfect: rate===100, attended: present});
     speak('今天出席率' + rate + '巴仙！太厲害了！幾乎全員到齊！大家都很認真，繼續保持！', function(){
@@ -1319,10 +1316,7 @@ function endRollCall() {
 
   } else if (rate >= 75) {
     // 😊 高：開心 + 鼓勵
-    typeText('⏹ 點名結束
-出席 ' + present + '/' + (total||'?') + ' 位
-出席率 ' + rate + '%！很不錯！
-繼續保持，下次更好！');
+    typeText('⏹ 點名結束\n出席 ' + present + '/' + (total||'?') + ' 位\n出席率 ' + rate + '%！很不錯！\n繼續保持，下次更好！');
     setFace('happy');
     setTimeout(function(){ playSuccess(); }, 300);
     speak('今天出席率' + rate + '巴仙，很不錯！繼續保持，期待下次更多同學出席！', function(){
@@ -1331,10 +1325,7 @@ function endRollCall() {
 
   } else if (rate >= 60) {
     // 😐 普通：思考 → 鼓勵
-    typeText('⏹ 點名結束
-出席 ' + present + '/' + (total||'?') + ' 位
-出席率 ' + rate + '%
-希望下次更多同學能出席！');
+    typeText('⏹ 點名結束\n出席 ' + present + '/' + (total||'?') + ' 位\n出席率 ' + rate + '%\n希望下次更多同學能出席！');
     setFace('think');
     setTimeout(function(){
       speak('今天出席率' + rate + '巴仙。還不錯，但老師希望下次更多同學能來！', function(){
@@ -1347,18 +1338,14 @@ function endRollCall() {
 
   } else {
     // 😟 低：難過 → 搖頭 → 激勵
-    typeText('⏹ 點名結束
-出席 ' + present + '/' + (total||'?') + ' 位
-出席率只有 ' + rate + '%
-缺席的同學要加油了！');
+    typeText('⏹ 點名結束\n出席 ' + present + '/' + (total||'?') + ' 位\n出席率只有 ' + rate + '%\n缺席的同學要加油了！');
     setFace('error');
     playError();
     setTimeout(function(){
       speak('今天出席率只有' + rate + '巴仙，', function(){
         // 說完難過的部分，切換表情激勵
         setFace('listen');
-        typeText('缺席的同學，下次一定要來喔！
-出席才能跟上進度！加油 💪');
+        typeText('缺席的同學，下次一定要來喔！\n出席才能跟上進度！加油 💪');
         speak('缺席的同學，下次一定要來！出席才能跟上進度，老師在等你們！', function(){
           setFace('');
         });
