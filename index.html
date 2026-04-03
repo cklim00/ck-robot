@@ -649,6 +649,8 @@ function doLookup(studentId){
 
     var sName    = data.name;
     var courseId = data.courseId || 'GN432';
+    _lastStudentId = studentId;   // ✅ 給 fetchStudentStats 用
+    _lastCourseId  = courseId;
 
     // 立刻顯示成功
     checkedSet[key] = true;
