@@ -191,6 +191,7 @@ var _lastStudentId = '';
 var _lastCourseId  = 'GN432';
 var GARDEN_URL = '';
 var checkinCount = 0;
+var SESSION_TOTAL = 0;  // 應到人數，confirmSession 時存入
 var isListening  = false;
 var isSpeaking   = false;
 var recognition  = null;
@@ -475,6 +476,9 @@ function confirmSession(){
   SESSION_ID = inp.value.trim();
   // ✅ 花園投影牆直接用 GAS，不經過 Vercel（Vercel 不處理 garden 路由）
   GARDEN_URL = GAS_DIRECT_URL + '?garden=' + SESSION_ID;
+  // 儲存應到人數（從顯示文字讀取）
+  var totalEl = document.getElementById('cntTotal');
+  if (totalEl) SESSION_TOTAL = parseInt(totalEl.textContent.replace('/','')) || 0;
   var a = document.getElementById('scArea'); if(a) a.remove();
   setStatus('on', '就緒'); setFace('');
   playSessionConfirm();
@@ -499,6 +503,16 @@ function addGardenBtn(){
   btn.style.cssText = 'background:rgba(57,255,20,.1);border:2px solid #39ff14;color:#39ff14;font-family:VT323,monospace;font-size:16px;padding:4px 12px;cursor:pointer;margin-top:4px;';
   btn.onclick = function(){ window.open(GARDEN_URL, '_blank'); };
   document.querySelector('.robot-area').appendChild(btn);
+
+  // ── 結束點名按鈕（花園旁邊）──────────────────────
+  if (!document.getElementById('endBtn')) {
+    var endBtn = document.createElement('button');
+    endBtn.id = 'endBtn';
+    endBtn.textContent = '⏹ 結束點名';
+    endBtn.style.cssText = 'background:rgba(255,60,60,.12);border:2px solid #ff4444;color:#ff6666;font-family:VT323,monospace;font-size:16px;padding:4px 12px;cursor:pointer;margin-top:4px;margin-left:6px;display:block;width:calc(100% - 4px);';
+    endBtn.onclick = endRollCall;
+    document.querySelector('.robot-area').appendChild(endBtn);
+  }
 }
 
 function showManualInput(){
@@ -1274,6 +1288,84 @@ function stopListenSound() {
 // ════════════════════════════════════
 // 啟動覆蓋層控制
 // ════════════════════════════════════
+
+// ── 結束點名 ─────────────────────────────────────────────────────────────────
+function endRollCall() {
+  var present = checkinCount;
+  var total   = SESSION_TOTAL || parseInt(((document.getElementById('cntTotal')||{}).textContent||'').replace('/','')) || 0;
+  var rate    = total > 0 ? Math.round(present / total * 100) : 0;
+
+  // 停止聆聽
+  if (recognition) { try{ recognition.stop(); }catch(e){} }
+  stopListenSound();
+  setStatus('on', '點名結束');
+
+  // 按鈕變灰
+  var b = document.getElementById('endBtn');
+  if (b) { b.disabled=true; b.textContent='✅ 已結束'; b.style.opacity='.4'; }
+
+  // ── 依出席率選訊息 + 表情序列 ────────────────────────────────────────────
+  if (rate >= 90) {
+    // 🏆 超高：超級開心 + 花朵慶祝
+    typeText('⏹ 點名結束
+出席 ' + present + '/' + (total||'?') + ' 位
+出席率 ' + rate + '%！太棒了！！
+幾乎全員到齊！大家好厲害！');
+    setFaceSuper();
+    spawnFlowers(10, {ok:true, isPerfect: rate===100, attended: present});
+    speak('今天出席率' + rate + '巴仙！太厲害了！幾乎全員到齊！大家都很認真，繼續保持！', function(){
+      setFace('');
+    });
+
+  } else if (rate >= 75) {
+    // 😊 高：開心 + 鼓勵
+    typeText('⏹ 點名結束
+出席 ' + present + '/' + (total||'?') + ' 位
+出席率 ' + rate + '%！很不錯！
+繼續保持，下次更好！');
+    setFace('happy');
+    setTimeout(function(){ playSuccess(); }, 300);
+    speak('今天出席率' + rate + '巴仙，很不錯！繼續保持，期待下次更多同學出席！', function(){
+      setFace('');
+    });
+
+  } else if (rate >= 60) {
+    // 😐 普通：思考 → 鼓勵
+    typeText('⏹ 點名結束
+出席 ' + present + '/' + (total||'?') + ' 位
+出席率 ' + rate + '%
+希望下次更多同學能出席！');
+    setFace('think');
+    setTimeout(function(){
+      speak('今天出席率' + rate + '巴仙。還不錯，但老師希望下次更多同學能來！', function(){
+        // 說完後轉為鼓勵表情
+        setFace('happy');
+        typeText('加油！期待下次見到你們 💪');
+        setTimeout(function(){ setFace(''); }, 3000);
+      });
+    }, 800);
+
+  } else {
+    // 😟 低：難過 → 搖頭 → 激勵
+    typeText('⏹ 點名結束
+出席 ' + present + '/' + (total||'?') + ' 位
+出席率只有 ' + rate + '%
+缺席的同學要加油了！');
+    setFace('error');
+    playError();
+    setTimeout(function(){
+      speak('今天出席率只有' + rate + '巴仙，', function(){
+        // 說完難過的部分，切換表情激勵
+        setFace('listen');
+        typeText('缺席的同學，下次一定要來喔！
+出席才能跟上進度！加油 💪');
+        speak('缺席的同學，下次一定要來！出席才能跟上進度，老師在等你們！', function(){
+          setFace('');
+        });
+      });
+    }, 600);
+  }
+}
 var _started = false;
 function onStartClick(){
   if (_started) return;
