@@ -308,7 +308,7 @@ function confirmSession(){
   if(!inp || !inp.value.trim()) return;
   SESSION_ID = inp.value.trim();
   // ✅ 花園投影牆直接用 GAS，不經過 Vercel（Vercel 不處理 garden 路由）
-  GARDEN_URL = (data.gardenUrl || GAS_DIRECT_URL + '?garden=' + SESSION_ID);
+  GARDEN_URL = GAS_DIRECT_URL + '?garden=' + SESSION_ID;
   var a = document.getElementById('scArea'); if(a) a.remove();
   setStatus('on', '就緒'); setFace('');
   typeText('場次：'+SESSION_ID+'\n大家好！我是點名小CK！\n請按按鈕說出學號！');
