@@ -25,6 +25,18 @@ body::after{content:'';position:fixed;inset:0;background:radial-gradient(ellipse
 
 
 /* ── 花朵飄上特效 ── */
+
+.float-text{position:fixed;bottom:-60px;pointer-events:none;z-index:501;
+  font-family:'VT323',monospace;font-weight:700;text-align:center;
+  animation:textFloat linear forwards;white-space:nowrap;
+  text-shadow:0 0 8px currentColor;}
+@keyframes textFloat{
+  0%  {transform:translateY(0) scale(.7) rotate(0deg);opacity:0}
+  12% {opacity:1;transform:translateY(-8px) scale(1.15) rotate(-3deg)}
+  25% {transform:translateY(-20vh) scale(1) rotate(2deg)}
+  75% {opacity:.95}
+  100%{transform:translateY(-105vh) scale(.85) rotate(5deg);opacity:0}
+}
 .float-flower{position:fixed;bottom:-80px;pointer-events:none;z-index:500;animation:flowerFloat linear forwards}
 @keyframes flowerFloat{
   0%  {transform:translateY(0) rotate(0deg) scale(.6);opacity:0}
@@ -816,28 +828,71 @@ function startAmbient() {
 // ── 花朵飄上特效 ─────────────────────────────────────────────────────────────
 var FLOWER_COLORS = ['#FF6B9D','#FFB347','#87CEEB','#98FB98','#DDA0DD','#F0E68C','#FF8C94','#B8E994','#A29BFE','#FD79A8','#55EFC4','#FDCB6E'];
 
+// ── 鼓勵語池 ─────────────────────────────────────────────────────────────────
+var CHEERS = [
+  // 中文
+  '棒！','讚！','太棒了！','好樣的！','優秀！','厲害！','完美！','滿分！',
+  '全勤達人！','準時到！','出席加分！','你最棒！','繼續保持！','超級棒！',
+  '破紀錄！','今天也很好！','出現了！','真準時！','好學生！',
+  // 英文
+  'NICE!','GREAT!','AWESOME!','PERFECT!','WOW!','COOL!','YES!',
+  'BRILLIANT!','AMAZING!','SUPERB!','FANTASTIC!','TOP!','BRAVO!',
+  // Emoji
+  '🌟','⭐','💫','✨','🎉','🎊','👏','💪','🏆','🥳',
+  '🔥','💯','👑','🌈','🦋','🍀','💚','🎯','🚀','😎',
+  '🌸','🌺','🌻','🌼','💐','🌷'
+];
+
 function spawnFlowers(count) {
-  count = count || 12;
+  count = count || 14;
+  // 花朵（前 count 個，交錯出現）
   for (var i = 0; i < count; i++) {
     (function(idx) {
       setTimeout(function() {
-        var color  = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
-        var size   = 28 + Math.random() * 28;
-        var left   = 5 + Math.random() * 90;
-        var dur    = 2.2 + Math.random() * 2.0;
-        var stage  = Math.floor(Math.random() * 4); // 0~3 花朵階段
-
+        var color = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+        var size  = 24 + Math.random() * 34;
+        var left  = 3 + Math.random() * 94;
+        var dur   = 2.0 + Math.random() * 2.2;
+        var stage = Math.floor(Math.random() * 4);
         var el = document.createElement('div');
         el.className = 'float-flower';
-        el.style.left  = left + 'vw';
+        el.style.left = left + 'vw';
         el.style.animationDuration = dur + 's';
-
-        var svg = makeMiniFlower(color, size, stage);
-        el.appendChild(svg);
+        el.appendChild(makeMiniFlower(color, size, stage));
         document.body.appendChild(el);
-        setTimeout(function(){ if(el.parentNode) el.parentNode.removeChild(el); }, (dur + 0.3) * 1000);
-      }, idx * 130 + Math.random() * 120);
+        setTimeout(function(){ if(el.parentNode)el.parentNode.removeChild(el); }, (dur+0.3)*1000);
+      }, idx * 110 + Math.random() * 100);
     })(i);
+  }
+  // 鼓勵文字/emoji（8個，隨機時間）
+  var usedCheers = [];
+  for (var j = 0; j < 8; j++) {
+    (function(jidx) {
+      setTimeout(function() {
+        // 隨機挑一個還沒用過的
+        var pool = CHEERS.filter(function(c){ return usedCheers.indexOf(c)<0; });
+        if(!pool.length){ usedCheers=[]; pool=CHEERS; }
+        var cheer = pool[Math.floor(Math.random()*pool.length)];
+        usedCheers.push(cheer);
+
+        var isEmoji = /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]/u.test(cheer);
+        var fontSize = isEmoji ? (1.8+Math.random()*1.6) : (1.3+Math.random()*1.2);
+        var left = 8 + Math.random() * 84;
+        var dur  = 2.5 + Math.random() * 2.0;
+        var colors = ['#39ff14','#FFD700','#FF6B9D','#87CEEB','#FFA500','#DDA0DD','#98FB98','#FF8C00'];
+        var color  = colors[Math.floor(Math.random()*colors.length)];
+
+        var el = document.createElement('div');
+        el.className = 'float-text';
+        el.style.left = left + 'vw';
+        el.style.fontSize = fontSize + 'em';
+        el.style.color = color;
+        el.style.animationDuration = dur + 's';
+        el.textContent = cheer;
+        document.body.appendChild(el);
+        setTimeout(function(){ if(el.parentNode)el.parentNode.removeChild(el); }, (dur+0.3)*1000);
+      }, jidx * 200 + 150 + Math.random() * 200);
+    })(j);
   }
 }
 
