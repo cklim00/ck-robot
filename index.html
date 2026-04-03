@@ -938,56 +938,74 @@ var CHEERS_LOW = [    // 出席率 < 60%
 var CHEERS = CHEERS_GENERAL;
 
 function spawnFlowers(count, stats) {
-  count = count || 14;
+  // 每次隨機選 1 種飄出類型，保持 Robot 獨特個性
+  var TYPES = ['flowers', 'emoji', 'chinese', 'english'];
+  var pick  = TYPES[Math.floor(Math.random() * TYPES.length)];
   var cheerPool = getCheerPool(stats);
-  // 花朵（前 count 個，交錯出現）
-  for (var i = 0; i < count; i++) {
-    (function(idx) {
-      setTimeout(function() {
-        var color = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
-        var size  = 24 + Math.random() * 34;
-        var left  = 3 + Math.random() * 94;
-        var dur   = 2.0 + Math.random() * 2.2;
-        var stage = Math.floor(Math.random() * 4);
-        var el = document.createElement('div');
-        el.className = 'float-flower';
-        el.style.left = left + 'vw';
-        el.style.animationDuration = dur + 's';
-        el.appendChild(makeMiniFlower(color, size, stage));
-        document.body.appendChild(el);
-        setTimeout(function(){ if(el.parentNode)el.parentNode.removeChild(el); }, (dur+0.3)*1000);
-      }, idx * 110 + Math.random() * 100);
-    })(i);
-  }
-  // 鼓勵文字/emoji（8個，隨機時間）
-  var usedCheers = [];
-  for (var j = 0; j < 8; j++) {
-    (function(jidx) {
-      setTimeout(function() {
-        // 隨機挑一個還沒用過的
-        var pool = cheerPool.filter(function(c){ return usedCheers.indexOf(c)<0; });
-        if(!pool.length){ usedCheers=[]; pool=cheerPool; }
-        var cheer = pool[Math.floor(Math.random()*pool.length)];
-        usedCheers.push(cheer);
 
-        var isEmoji = /[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}]/u.test(cheer);
-        var fontSize = isEmoji ? (1.8+Math.random()*1.6) : (1.3+Math.random()*1.2);
-        var left = 8 + Math.random() * 84;
-        var dur  = 2.5 + Math.random() * 2.0;
-        var colors = ['#39ff14','#FFD700','#FF6B9D','#87CEEB','#FFA500','#DDA0DD','#98FB98','#FF8C00'];
-        var color  = colors[Math.floor(Math.random()*colors.length)];
+  // 分類鼓勵詞
+  var emojiOnly    = cheerPool.filter(function(c){ return /[\u{1F300}-\u{1FFFF}\u{2600}-\u{27BF}]/u.test(c); });
+  var chineseOnly  = cheerPool.filter(function(c){ return /[\u4e00-\u9fff]/.test(c) && !/[\u{1F300}-\u{1FFFF}]/u.test(c); });
+  var englishOnly  = cheerPool.filter(function(c){ return /^[A-Z! ]+$/.test(c.trim()); });
 
-        var el = document.createElement('div');
-        el.className = 'float-text';
-        el.style.left = left + 'vw';
-        el.style.fontSize = fontSize + 'em';
-        el.style.color = color;
-        el.style.animationDuration = dur + 's';
-        el.textContent = cheer;
-        document.body.appendChild(el);
-        setTimeout(function(){ if(el.parentNode)el.parentNode.removeChild(el); }, (dur+0.3)*1000);
-      }, jidx * 200 + 150 + Math.random() * 200);
-    })(j);
+  var n = count || 8;
+
+  if (pick === 'flowers') {
+    // 只飄花，少一點精緻
+    for (var i = 0; i < n; i++) {
+      (function(idx) {
+        setTimeout(function() {
+          var color = FLOWER_COLORS[Math.floor(Math.random() * FLOWER_COLORS.length)];
+          var size  = 26 + Math.random() * 32;
+          var left  = 5 + Math.random() * 90;
+          var dur   = 2.2 + Math.random() * 2.0;
+          var stage = Math.floor(Math.random() * 4);
+          var el = document.createElement('div');
+          el.className = 'float-flower';
+          el.style.left = left + 'vw';
+          el.style.animationDuration = dur + 's';
+          el.appendChild(makeMiniFlower(color, size, stage));
+          document.body.appendChild(el);
+          setTimeout(function(){ if(el.parentNode)el.parentNode.removeChild(el); }, (dur+0.3)*1000);
+        }, idx * 180 + Math.random() * 100);
+      })(i);
+    }
+
+  } else {
+    // 只飄文字/emoji，選特定類型，3-4 個
+    var pool = pick === 'emoji'   ? emojiOnly :
+               pick === 'chinese' ? chineseOnly : englishOnly;
+    if (!pool || pool.length < 2) pool = cheerPool;
+
+    var shown = [];
+    var showCount = 3 + Math.floor(Math.random() * 2); // 3 or 4
+    for (var j = 0; j < showCount; j++) {
+      (function(jidx) {
+        setTimeout(function() {
+          var available = pool.filter(function(c){ return shown.indexOf(c) < 0; });
+          if (!available.length) { shown = []; available = pool; }
+          var cheer = available[Math.floor(Math.random() * available.length)];
+          shown.push(cheer);
+
+          var isEmoji = /[\u{1F300}-\u{1FFFF}\u{2600}-\u{27BF}]/u.test(cheer);
+          var fontSize = isEmoji ? (2.2 + Math.random() * 1.4) : (1.6 + Math.random() * 1.0);
+          var left  = 15 + Math.random() * 70;
+          var dur   = 2.8 + Math.random() * 1.8;
+          var colors = ['#39ff14','#FFD700','#FF6B9D','#87CEEB','#FFA500','#DDA0DD'];
+          var color  = colors[Math.floor(Math.random() * colors.length)];
+
+          var el = document.createElement('div');
+          el.className = 'float-text';
+          el.style.left = left + 'vw';
+          el.style.fontSize = fontSize + 'em';
+          el.style.color = color;
+          el.style.animationDuration = dur + 's';
+          el.textContent = cheer;
+          document.body.appendChild(el);
+          setTimeout(function(){ if(el.parentNode)el.parentNode.removeChild(el); }, (dur+0.3)*1000);
+        }, jidx * 350 + Math.random() * 200);
+      })(j);
+    }
   }
 }
 
