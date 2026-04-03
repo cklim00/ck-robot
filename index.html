@@ -1270,7 +1270,10 @@ function stopListenSound() {
 // ════════════════════════════════════
 // 啟動
 // ════════════════════════════════════
+var _started = false;
 function onStartClick(){
+  if (_started) return;  // 중복 클릭 방지
+  _started = true;
   var overlay = document.getElementById('startOverlay');
   if(overlay){
     overlay.style.transition = 'opacity .4s';
@@ -1278,16 +1281,15 @@ function onStartClick(){
     setTimeout(function(){ overlay.style.display='none'; }, 400);
   }
   loadVoices();
-  initAudio();          // 音效在用戶點擊後立即解鎖
-  setTimeout(init, 200); // 短暫延遲讓啟動音先播
+  initAudio();
+  setTimeout(init, 200);
 }
 
 window.addEventListener('load', function(){
   // 不自動 init，等用戶點擊 overlay
 });
-</script>
-</body>
-</html>// ── 鼓勵語池（通用）─────────────────────────────────────────────────────────
+
+// ── 鼓勵語池（通用）─────────────────────────────────────────────────────────
 var CHEERS_GENERAL = [
   'NICE!','GREAT!','AWESOME!','WOW!','COOL!','BRILLIANT!','BRAVO!','YES!',
   '棒！','讚！','太棒了！','好樣的！','優秀！','厲害！','完美！',
@@ -1786,7 +1788,6 @@ function jsonp(url, cb){
 // ════════════════════════════════════
 // 啟動：先暖機再抓場次
 // ════════════════════════════════════
-var _warmupIv = null;
 function warmUp(cb){
   var startT = Date.now();
   typeText('系統暖機中...\n首次啟動約需 10 秒');
@@ -2610,21 +2611,11 @@ function stopListenSound() {
 // ════════════════════════════════════
 // 啟動
 // ════════════════════════════════════
-function onStartClick(){
-  var overlay = document.getElementById('startOverlay');
-  if(overlay){
-    overlay.style.transition = 'opacity .4s';
-    overlay.style.opacity = '0';
-    setTimeout(function(){ overlay.style.display='none'; }, 400);
-  }
-  loadVoices();
-  initAudio();          // 音效在用戶點擊後立即解鎖
-  setTimeout(init, 200); // 短暫延遲讓啟動音先播
-}
 
-window.addEventListener('load', function(){
-  // 不自動 init，等用戶點擊 overlay
-});
+
+</script>
+</body>
+
 </script>
 </body>
 </html>
